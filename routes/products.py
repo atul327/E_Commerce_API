@@ -96,6 +96,9 @@ def update_product_details(product : schema.UpdateProduct , p_id : int = Path(ex
     
     db_product = db.query(models.Product).filter(models.Product.id == p_id).first()
 
+    if not db_product:
+        raise HTTPException(status_code=404, detail="Product not Found")
+
     db_product.name = product.name
     db_product.price = product.price
 
@@ -121,6 +124,9 @@ def delete_product(p_id : int = Path(example="1", description="Product ID"), cur
         raise HTTPException(status_code=403, detail="User can't delete Product")
     
     db_id = db.query(models.Product).filter(models.Product.id == p_id).first()
+
+    if not db_id:
+        raise HTTPException(status_code=404, detail="Product not found!")
 
     db.delete(db_id)
     db.commit()

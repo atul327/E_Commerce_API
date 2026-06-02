@@ -1,4 +1,4 @@
-from sqlalchemy import Column, Integer, String, Float
+from sqlalchemy import Column, Integer, String, Float, ForeignKey
 from database import Base
 
 class User(Base):
@@ -19,3 +19,10 @@ class Product(Base):
     name = Column(String)
     price = Column(Float)
 
+class Cart(Base):
+    __tablename__  = "cart"
+
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    user_id = Column(Integer, ForeignKey(User.id))
+    product_id = Column(Integer, ForeignKey(Product.id))
+    quantity = Column(Integer)
