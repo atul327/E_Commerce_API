@@ -17,7 +17,8 @@ def get_db():
         yield db
     finally:
         db.close()
-
+        
+# request the token from header and verify it
 def get_current_user(authorization : str = Header()):
     if not authorization:
         raise HTTPException(status_code=403, detail="Missing Token")
