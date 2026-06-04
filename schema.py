@@ -7,7 +7,8 @@ class Registration(BaseModel):
     mob_num : str = Field(min_length=10, max_length=10)
     password : str = Field(min_length=8, max_length=12)
     date_of_birth :  str = Field(description="12-10-2006")
-    role : str
+    role : Optional[str]
+    user_address : str
 
 class Login(BaseModel):
     email : EmailStr
@@ -15,7 +16,8 @@ class Login(BaseModel):
 
 class UpdateProfile(BaseModel):
     username : Optional[str]
-    mob_num : str = Field(min_length=10, max_length=10)
+    mob_num : Optional[str] = Field(min_length=10, max_length=10)
+    user_address : Optional[str]
 
 class ChangePass(BaseModel):
     old_password : str
@@ -36,3 +38,7 @@ class AddToCart(BaseModel):
 
 class UpdateCart(BaseModel):
     quantity : int
+
+class Order(BaseModel):
+    user_id : int
+    payment_method : str

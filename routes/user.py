@@ -30,7 +30,8 @@ def register(user : schema.Registration, db : Session = Depends(get_db)):
         mob_num = user.mob_num,
         password = auth.hashed_pass(user.password),
         date_of_birth = user.date_of_birth,
-        role = "user"
+        role = "user",
+        user_address = user.user_address
     )
 
     db.add(new_user)
@@ -91,7 +92,8 @@ def profile(current_user = Depends(get_current_user), db : Session = Depends(get
         "current_user" : {
                 "id" : user.id,
                 "username" : user.username,
-                "email" : user.email
+                "email" : user.email,
+                "user_address" : user.user_address
             }
         }
    
@@ -110,6 +112,7 @@ def update_profile( user : schema.UpdateProfile ,current_user = Depends(get_curr
 
     db_user.username = user.username
     db_user.mob_num = user.mob_num 
+    db_user.user_address = user.user_address
 
     db.commit()
     db.refresh(db_user)
