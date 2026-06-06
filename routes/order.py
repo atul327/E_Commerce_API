@@ -111,3 +111,55 @@ def order_item(current_user = Depends(get_current_user), db : Session = Depends(
         "message" : "Order Item added successfully",
         "order_item" : new_order_item
     }
+
+# route for the showing User order details
+@order_route.get("/myorder")
+def my_order(current_user = Depends(get_current_user), db : Session = Depends(get_db)):
+
+    # for getting the current login use email
+    user_email = current_user.get("sub")
+
+    # getting the current login User Data using email
+    db_user = db.query(models.User).filter(models.User.email == user_email).first()
+
+    # fetching the login user order using user_id
+    result = (
+        db.query(
+            models.Order.id,
+            models.Order.user_id,
+            models.Product.name,
+            models.OrderItem.quantity,
+            models.OrderItem.price
+        )
+        .join(
+            models.OrderItem,  #isme orderItem table ko order table se join krr rhe
+            models.Order.id == models.OrderItem.order_id
+        )
+        .join(
+            models.Product,
+            models.OrderItem.product_id == models.Product.id
+        )
+        .filter(models.Order.user_id == db_user.id).all()
+    )
+
+    my_order = []
+    # .all() return the list so to return the data need for loop
+    for item in result:
+        my_order.append({
+            "order_id" : item.id,
+            "user_id" : item.user_id,
+            "product_name" : item.name,
+            "Quantity" : item.quantity,
+            "price" : item.price
+            })
+        
+    if len(my_order) == 0:
+        raise HTTPException(404, "No order details found")
+
+    return {
+        "message" : "Oredr Details",
+        "myorder" : my_order
+    }
+
+
+
