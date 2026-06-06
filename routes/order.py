@@ -164,5 +164,48 @@ def my_order(current_user = Depends(get_current_user), db : Session = Depends(ge
         "myorder" : my_order
     }
 
+@order_route.get("/order_details")
+def order_details(current_user = Depends(get_current_user), db : Session = Depends(get_db)):
+    user_email = current_user.get("sub")
 
+    db_user = db.query(models.User).filter(models.User.email == user_email).first()
 
+    result = (
+        db.query(
+            models.Order.id,
+            models.Product.name,
+            models.OrderItem.quantity,
+            models.OrderItem.price,
+            models.Order.payment_method,
+            models.OrderItem.subtotal,
+            models.Order.created_at,
+            models.Order.status
+        )
+        .join(
+            models.OrderItem,
+            models.Order.id == models.OrderItem.order_id
+        )
+        .join(
+            models.Product,
+            models.OrderItem.product_id == models.Product.id
+        )
+        .filter(models.Order.user_id == db_user.id).all() 
+    )
+
+    order_details_list = []
+    for item in result:
+        order_details_list.append({
+            "Order_id" : item.id,
+            "Product_name" : item.name,
+            "Quantity" : item.quantity,
+            "Price" : item.price,
+            "Payment_Method" : item.payment_method,
+            "Total price" : item.subtotal,
+            "Cteated time": item.created_at,
+            "Status" : item.status
+        }) 
+
+    return {
+        "message" : "Order Details",
+        "Order Details" : order_details_list
+    }
