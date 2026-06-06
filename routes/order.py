@@ -122,7 +122,7 @@ def my_order(current_user = Depends(get_current_user), db : Session = Depends(ge
     # getting the current login User Data using email
     db_user = db.query(models.User).filter(models.User.email == user_email).first()
 
-    # fetching the login user order using user_id
+    # use join to fetch 3 table data 
     result = (
         db.query(
             models.Order.id,
@@ -131,14 +131,17 @@ def my_order(current_user = Depends(get_current_user), db : Session = Depends(ge
             models.OrderItem.quantity,
             models.OrderItem.price
         )
+        # Join OrderItem Table to Order Table
         .join(
             models.OrderItem,  #isme orderItem table ko order table se join krr rhe
             models.Order.id == models.OrderItem.order_id
         )
+        # join the product table to OrderItem table 
         .join(
             models.Product,
             models.OrderItem.product_id == models.Product.id
         )
+        # Get only current user data
         .filter(models.Order.user_id == db_user.id).all()
     )
 
