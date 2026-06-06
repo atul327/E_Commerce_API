@@ -44,6 +44,9 @@ def register(user : schema.Registration, db : Session = Depends(get_db)):
 def login(user : schema.Login, db : Session = Depends(get_db)):
     user_email = db.query(models.User).filter(models.User.email == user.email).first()
 
+    if user_email.is_active:
+        raise HTTPException(status_code=403, detail="Account has been deleted")
+
     if not user_email:
         raise HTTPException(status_code=404, detail="User not found")
     
@@ -155,3 +158,17 @@ def change_password(user : schema.ChangePass, current_user = Depends(get_current
     }
 
 
+@user_route.delete("/delete_account")
+def detele_user_account(current_user = Depends(get_current_user), db : Session = Depends(get_db)):
+    user_email =current_user.get("sub")
+    
+    db_user = db.query(models.User).filter(models.User.email == user_email).first()
+
+    db_user.is_active = False
+
+    db.commit()
+    db.refresh(db_user)
+
+    return {
+        "message" : "User Deleted Sucessfully"
+    }
