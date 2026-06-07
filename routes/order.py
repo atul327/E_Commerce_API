@@ -1,6 +1,7 @@
-from fastapi import APIRouter, Header, Depends, HTTPException
+from fastapi import APIRouter, Header, Depends, HTTPException, Path
 from database import SessionLocal
 from sqlalchemy.orm import Session 
+from sqlalchemy import or_, and_
 
 import models
 import schema
@@ -209,3 +210,42 @@ def order_details(current_user = Depends(get_current_user), db : Session = Depen
         "message" : "Order Details",
         "Order Details" : order_details_list
     }
+
+
+@order_route.put("/cancel/{p_id}")
+def order_cancel(p_id : int = Path(), current_user = Depends(get_current_user), db : Session = Depends(get_db)):
+    user_email = current_user.get("sub")
+
+    db_user = db.query(models.User).filter(models.User.email == user_email).first()
+
+    db_product = db.query(models.Product).filter(models.Product.id == p_id).first()
+
+    if not db_product:
+        raise HTTPException(status_code=403, detail="Product not found")
+    
+    db_orderItem = db.query(models.OrderItem).filter(models.OrderItem.product_id == db_product.id).first()
+
+    if not db_orderItem:
+        raise HTTPException(status_code=403, detail="Order not found")
+
+    db_order = db.query(models.Order).filter(
+        and_(
+            models.Order.id == db_orderItem.order_id,
+            models.Order.user_id == db_user.id
+        )).first()
+
+    if db_orderItem.product_id == p_id and db_order.status in ["Pending", "Shipped", "Processing", "Confirm"]:
+        db_order.status = "Cancelled"
+
+    db.commit()
+    db.refresh(db_order)
+
+    return{
+        "message" : "Order is cancelled"
+    }
+
+
+
+        
+
+            
