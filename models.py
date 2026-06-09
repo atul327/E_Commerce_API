@@ -16,6 +16,8 @@ class User(Base):
     is_active = Column(String, default=True)
 
 class Product(Base):
+
+    
     __tablename__ = "products"
 
     id = Column(Integer, primary_key=True, autoincrement=True)

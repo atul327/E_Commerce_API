@@ -57,7 +57,7 @@ def place_order(order : schema.Order, current_user = Depends(get_current_user), 
     new_order = models.Order(
         user_id = user_id,
         total_amount = total_amount,
-        status = "Processing",
+        status = "Pending",
         payment_method = order.payment_method,
         user_address = db_user.user_address
     )
@@ -241,11 +241,63 @@ def order_cancel(p_id : int = Path(), current_user = Depends(get_current_user), 
     db.refresh(db_order)
 
     return{
-        "message" : "Order is cancelled"
+        "message" : "Order is cancelled",
+        "cancelled Order" : db_product.name
     }
 
+@order_route.get("/all")
+def fetch_all_order(current_user = Depends(get_current_user), db : Session = Depends(get_db)):
+    user_email = current_user.get("sub")
 
+    db_user = db.query(models.User).filter(models.User.email == user_email).first()
 
-        
+    if db_user.role != "admin":
+        raise HTTPException(status_code=403, detail="User cant see all order")    
+
+    db_orderItem = db.query(models.OrderItem).all()
+
+    return {
+        "message" : "All order details",
+        "orders" : db_orderItem
+    }
+
+@order_route.put("/update_status/{order_id}")
+def update_order_status(order_status : schema.UpdateStatus, order_id : int, current_user = Depends(get_current_user), db : Session = Depends(get_db)):
+    user_email = current_user.get("sub")
+
+    db_user = db.query(models.User).filter(models.User.email == user_email).first()
+
+    if db_user.role != "admin":
+        raise HTTPException(status_code=403, detail="User can't update the status")
+    
+    db_order = db.query(models.Order).filter(models.Order.id == order_id).first()
+
+    if not db_order:
+        raise HTTPException(status_code=403, detail="Order not found")
+
+    if db_order.status == "Pending":
+        db_order.status = "Processing"
+
+    elif db_order.status == "Processing":
+        db_order.status = "Shipped"
+
+    elif db_order.status == "Shipped":
+        db_order.status = "Delevered"
+
+    else:
+        raise HTTPException(
+            status_code=400,
+            detail="Order cannot be updated further"
+        )
+    
+    db.commit()
+    db.refresh(db_order)
+
+    return {
+        "message" : "Order status is updated",
+        "order_id" : order_id,
+        "order_status" : db_order.status
+    }
+
 
             

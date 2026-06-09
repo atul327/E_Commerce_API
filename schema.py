@@ -1,5 +1,6 @@
 from pydantic import BaseModel, EmailStr, Field
 from typing import Optional
+from enum import Enum
 
 class Registration(BaseModel):
     username : str 
@@ -42,3 +43,15 @@ class UpdateCart(BaseModel):
 class Order(BaseModel):
     user_id : int
     payment_method : str
+
+
+# Only alow fixed value from this gien below
+class OrderStatus(str, Enum):
+    Pending = "Pending"
+    Processing = "Processing"
+    Shipped = "Shipped"
+    Delevered = "Delevered"
+    Cancelled = "Cancelled"
+
+class UpdateStatus(BaseModel):
+    status : OrderStatus
