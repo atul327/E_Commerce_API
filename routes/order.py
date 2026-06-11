@@ -19,6 +19,7 @@ def get_db():
     finally:
         db.close()
 
+# To get and verify the user
 def get_current_user(authorization : str = Header()):
     if not authorization:
         raise HTTPException(status_code=403, detail = "Missing token")
@@ -29,6 +30,7 @@ def get_current_user(authorization : str = Header()):
 
     return payload
 
+# 
 @order_route.post("/place")
 def place_order(order : schema.Order, current_user = Depends(get_current_user), db : Session = Depends(get_db)):
 
@@ -37,22 +39,22 @@ def place_order(order : schema.Order, current_user = Depends(get_current_user), 
     db_user = db.query(models.User).filter(models.User.email == user_email).first()
 
     user_id = db_user.id
-
-    if user_id != order.user_id:
-        raise HTTPException(status_code=404, detail = "User Not Found")
     
-
-    cart_item = db.query(models.Cart).filter(models.Cart.user_id == user_id).first()
+    db_cart = db.query(models.Cart).filter(models.Cart.user_id == user_id).all()
     
-    if not cart_item:
+    if not db_cart:
         raise HTTPException(
             status_code=404,
             detail="Cart is empty"
         )
     
-    db_product = db.query(models.Product).filter(models.Product.id == cart_item.product_id).first()
+    total_amount = 0
 
-    total_amount = cart_item.quantity * db_product.price
+    for item in db_cart: 
+        db_product = db.query(models.Product).filter(models.Product.id == item.product_id).first()
+
+        total = item.quantity * db_product.price
+        total_amount += total
 
     new_order = models.Order(
         user_id = user_id,
@@ -63,55 +65,110 @@ def place_order(order : schema.Order, current_user = Depends(get_current_user), 
     )
 
     db.add(new_order)
+
+    # order_by is used to find the the latest order_id from the order table
+    db_order = db.query(models.Order)\
+        .filter(models.Order.user_id == user_id)\
+        .order_by(models.Order.id.desc())\
+        .first()
+    
+    if not db_order:
+        raise HTTPException(status_code=404, detail="User order not found")
+    
+    for item in db_cart:
+        db_product = db.query(models.Product).filter(models.Product.id == item.product_id).first()
+
+        if not db_product:
+            raise HTTPException(
+                404,
+                "Product not found"
+            )
+        
+        sub_total = item.quantity * db_product.price
+
+        new_order_item = models.OrderItem(
+            order_id = db_order.id,
+            product_id = item.product_id,
+            quantity = item.quantity,
+            price = db_product.price,
+            subtotal = sub_total
+        )
+
+
+        db.add(new_order_item)
+
+
     db.commit()
     db.refresh(new_order)
 
-    return {
-        "message" : "Order Placed",
-        "order_details" : new_order
-    }
+    # taki user duplicate cart use na krr ske
+    for item in db_cart:
+        db.delete(item)
 
-
-@order_route.post("/orderitem")
-def order_item(current_user = Depends(get_current_user), db : Session = Depends(get_db)):
-    user_email = current_user.get("sub")
-
-    db_user = db.query(models.User).filter(models.User.email == user_email).first()
-    user_id = db_user.id  
-
-    if not user_id:
-        raise HTTPException(status_code=404, detail="User not found")
-
-    db_cart = db.query(models.Cart).filter(models.Cart.user_id == user_id).first()
-
-    if not db_cart:
-        raise HTTPException(status_code=403, detail="Cart Product not found")
-
-    db_product = db.query(models.Product).filter(models.Product.id == db_cart.product_id).first()
-
-    db_order = db.query(models.Order).filter(models.Order.user_id == user_id).first()
-
-    if not db_order:
-        raise HTTPException(status_code=403, detail="User order not found")
-
-    sub_total = db_cart.quantity * db_product.price
-
-    new_order_item = models.OrderItem(
-        order_id = db_order.id,
-        product_id = db_cart.product_id,
-        quantity = db_cart.quantity,
-        price = db_product.price,
-        subtotal = sub_total
-    )
-
-    db.add(new_order_item)
     db.commit()
     db.refresh(new_order_item)
 
     return {
-        "message" : "Order Item added successfully",
-        "order_item" : new_order_item
+        "message" : "Order Placed",
+        "Status" : db_order.status,
+        "order_details" : new_order
     }
+
+
+# @order_route.post("/orderitem")
+# def order_item(current_user = Depends(get_current_user), db : Session = Depends(get_db)):
+#     user_email = current_user.get("sub")
+
+#     db_user = db.query(models.User).filter(models.User.email == user_email).first()
+#     user_id = db_user.id  
+
+#     # order_by is used to find the the latest order_id from the order table
+#     db_order = db.query(models.Order)\
+#         .filter(models.Order.user_id == user_id)\
+#         .order_by(models.Order.id.desc())\
+#         .first()
+
+#     if not db_order:
+#         raise HTTPException(status_code=404, detail="User order not found")
+
+#     db_cart = db.query(models.Cart).filter(models.Cart.user_id == user_id).all()
+
+#     if not db_cart:
+#         raise HTTPException(status_code=403, detail="Cart Product not found")
+
+#     for item in db_cart:
+#         db_product = db.query(models.Product).filter(models.Product.id == item.product_id).first()
+
+#         if not db_product:
+#             raise HTTPException(
+#                 404,
+#                 "Product not found"
+#             )
+        
+#         sub_total = item.quantity * db_product.price
+
+#         new_order_item = models.OrderItem(
+#             order_id = db_order.id,
+#             product_id = item.product_id,
+#             quantity = item.quantity,
+#             price = db_product.price,
+#             subtotal = sub_total
+#         )
+
+
+#         db.add(new_order_item)
+
+#     # taki user duplicate cart use na krr ske
+#     for item in db_cart:
+#         db.delete(item)
+
+#     db.commit()
+#     db.refresh(new_order_item)
+
+#     return {
+#         "message" : "Order Item added successfully",
+#         "order_item" : new_order_item
+#     }
 
 # route for the showing User order details
 @order_route.get("/myorder")
@@ -211,39 +268,39 @@ def order_details(current_user = Depends(get_current_user), db : Session = Depen
         "Order Details" : order_details_list
     }
 
-
-@order_route.put("/cancel/{p_id}")
-def order_cancel(p_id : int = Path(), current_user = Depends(get_current_user), db : Session = Depends(get_db)):
+@order_route.put("/cancel/{order_id}")
+def cancel_order(order_id : int = Path(), current_user = Depends(get_current_user), db : Session = Depends(get_db)):
     user_email = current_user.get("sub")
 
     db_user = db.query(models.User).filter(models.User.email == user_email).first()
 
-    db_product = db.query(models.Product).filter(models.Product.id == p_id).first()
-
-    if not db_product:
-        raise HTTPException(status_code=403, detail="Product not found")
-    
-    db_orderItem = db.query(models.OrderItem).filter(models.OrderItem.product_id == db_product.id).first()
-
-    if not db_orderItem:
-        raise HTTPException(status_code=403, detail="Order not found")
-
     db_order = db.query(models.Order).filter(
-        and_(
-            models.Order.id == db_orderItem.order_id,
-            models.Order.user_id == db_user.id
-        )).first()
+            models.Order.user_id == db_user.id,
+            models.Order.id == order_id).first()
+    
+    if not db_order:
+        raise HTTPException(status_code=403, detail="Order not found")
+    
+    existing_status = db.query(models.Order).filter(
+        models.Order.id == order_id,
+        models.Order.status == "Cancelled"
+    ).first()
 
-    if db_orderItem.product_id == p_id and db_order.status in ["Pending", "Shipped", "Processing", "Confirm"]:
-        db_order.status = "Cancelled"
+    if existing_status:
+        raise HTTPException(status_code=403, detail = f"Order is already {db_order.status}")
+    
+    db_order.status = "Cancelled"
 
     db.commit()
     db.refresh(db_order)
 
-    return{
-        "message" : "Order is cancelled",
-        "cancelled Order" : db_product.name
+    return {
+        "message" : "Order cancelled",
+        "order_id" : db_order.id,
+        "Status" : db_order.status
     }
+
+
 
 @order_route.get("/all")
 def fetch_all_order(current_user = Depends(get_current_user), db : Session = Depends(get_db)):
@@ -287,7 +344,7 @@ def update_order_status(order_status : schema.UpdateStatus, order_id : int, curr
     else:
         raise HTTPException(
             status_code=400,
-            detail="Order cannot be updated further"
+            detail="Order is delevered and cannot be updated further"
         )
     
     db.commit()
@@ -300,4 +357,87 @@ def update_order_status(order_status : schema.UpdateStatus, order_id : int, curr
     }
 
 
+@order_route.post("/returns/{order_id}")
+def return_order(reason : schema.OrderReturn, order_id : int = Path(), current_user = Depends(get_current_user), db : Session = Depends(get_db)):
+    user_email = current_user.get("sub")
+
+    db_user = db.query(models.User).filter(models.User.email == user_email).first()
+
+    db_order = db.query(models.Order).filter(
+                            models.Order.id == order_id,
+                            models.Order.user_id == db_user.id
+                        ).first()
+
+    if not db_order:
+        raise HTTPException(404, "Order not found")
+
+    if db_order.status != "Delevered":
+        raise HTTPException(403, "Only delivered orders can be returned")
+    
+    db_orderItem = db.query(models.OrderItem).filter(models.OrderItem.order_id == db_order.id).first()    
+
+    return_order = models.Returns(
+        user_id=db_order.user_id,
+        order_id=db_order.id,
+        product_id=db_orderItem.product_id,
+        type="Return",
+        reason=reason.reason.value
+    )
+
+    db.add(return_order)
+    db.commit()
+    db.refresh(return_order)
+    
+    return {
+        "message" : "Order return Successfull",
+        "order_id" : db_orderItem.order_id
+    }
+
+
+@order_route.post("/replace/{order_id}")
+def replace_order_item(reason : schema.OrderReplace, order_id : int = Path(), current_user = Depends(get_current_user), db : Session = Depends(get_db)):
+    user_email = current_user.get("sub")
+
+    db_user = db.query(models.User).filter(models.User.email == user_email).first()
+
+    db_order = db.query(models.Order).filter(
+            models.Order.user_id == db_user.id,
+            models.Order.id == order_id
+            ).first()
+
+    if db_order.status == "Delevered":
+        
+        db_orderItem = db.query(models.OrderItem).filter(models.OrderItem.order_id == order_id).first()
+
+        if not db_orderItem:
+            raise HTTPException(
+                status_code=404,
+                detail="Order items not found"
+            )
+        existing_order = db.query(models.Returns).filter(
+            models.Returns.order_id == order_id,
+            models.Returns.type == "Replace"
+        ).first()
+
+        if existing_order:
+            raise HTTPException(status_code=400, detail="Replace request already exist")
             
+        replace_order = models.Returns(
+            user_id = db_user.id,
+            order_id = order_id,
+            product_id =  db_orderItem.product_id,
+            type = "Replace",
+            reason = reason.reason.value
+        )
+
+        db.add(replace_order)
+    else:
+        raise HTTPException(status_code=403, detail = "The order is "+ db_order.status)
+    
+    db.commit()
+    db.refresh(replace_order)
+
+    return {
+        "message" : "Order Replace success",
+        "order_id" : db_orderItem.order_id
+    }

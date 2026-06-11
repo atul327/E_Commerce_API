@@ -16,8 +16,6 @@ class User(Base):
     is_active = Column(String, default=True)
 
 class Product(Base):
-
-    
     __tablename__ = "products"
 
     id = Column(Integer, primary_key=True, autoincrement=True)
@@ -53,3 +51,14 @@ class OrderItem(Base):
     price = Column(Float)
     subtotal = Column(Float)
 
+class Returns(Base):
+    __tablename__ = "returns"
+
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    user_id = Column(Integer, ForeignKey(User.id))
+    order_id = Column(Integer, ForeignKey(Order.id))
+    product_id = Column(Integer, ForeignKey(Product.id))
+    type = Column(String(50))
+    reason = Column(String(50))
+    status = Column(String(50))
+    created_at = Column(DateTime, default=datetime.now)

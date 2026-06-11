@@ -55,3 +55,19 @@ class OrderStatus(str, Enum):
 
 class UpdateStatus(BaseModel):
     status : OrderStatus
+
+class OrderReturnReason(str, Enum):
+    Damaged = "Damaged product"
+    Wrong = "Wrong product"
+    NotSatisfied = "Not satisfied"
+    Defective = "Defective"
+
+class OrderReturn(BaseModel):
+    reason : OrderReturnReason
+
+class OrderReplaceReason(str, Enum):
+    Wrong = "Wrong product"
+    Defective = "Defective"
+
+class OrderReplace(BaseModel):
+    reason : OrderReplaceReason
