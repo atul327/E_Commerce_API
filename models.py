@@ -20,6 +20,7 @@ class Product(Base):
 
     id = Column(Integer, primary_key=True, autoincrement=True)
     name = Column(String)
+    stock = Column(Integer)
     price = Column(Float)
 
 class Cart(Base):

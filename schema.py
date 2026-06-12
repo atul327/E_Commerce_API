@@ -26,6 +26,7 @@ class ChangePass(BaseModel):
 
 class AddProduct(BaseModel):
     name : str
+    stock : int
     price : float
     
 class UpdateProduct(BaseModel):

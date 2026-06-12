@@ -114,62 +114,6 @@ def place_order(order : schema.Order, current_user = Depends(get_current_user), 
         "order_details" : new_order
     }
 
-
-# @order_route.post("/orderitem")
-# def order_item(current_user = Depends(get_current_user), db : Session = Depends(get_db)):
-#     user_email = current_user.get("sub")
-
-#     db_user = db.query(models.User).filter(models.User.email == user_email).first()
-#     user_id = db_user.id  
-
-#     # order_by is used to find the the latest order_id from the order table
-#     db_order = db.query(models.Order)\
-#         .filter(models.Order.user_id == user_id)\
-#         .order_by(models.Order.id.desc())\
-#         .first()
-
-#     if not db_order:
-#         raise HTTPException(status_code=404, detail="User order not found")
-
-#     db_cart = db.query(models.Cart).filter(models.Cart.user_id == user_id).all()
-
-#     if not db_cart:
-#         raise HTTPException(status_code=403, detail="Cart Product not found")
-
-#     for item in db_cart:
-#         db_product = db.query(models.Product).filter(models.Product.id == item.product_id).first()
-
-#         if not db_product:
-#             raise HTTPException(
-#                 404,
-#                 "Product not found"
-#             )
-        
-#         sub_total = item.quantity * db_product.price
-
-#         new_order_item = models.OrderItem(
-#             order_id = db_order.id,
-#             product_id = item.product_id,
-#             quantity = item.quantity,
-#             price = db_product.price,
-#             subtotal = sub_total
-#         )
-
-
-#         db.add(new_order_item)
-
-#     # taki user duplicate cart use na krr ske
-#     for item in db_cart:
-#         db.delete(item)
-
-#     db.commit()
-#     db.refresh(new_order_item)
-
-#     return {
-#         "message" : "Order Item added successfully",
-#         "order_item" : new_order_item
-#     }
-
 # route for the showing User order details
 @order_route.get("/myorder")
 def my_order(current_user = Depends(get_current_user), db : Session = Depends(get_db)):

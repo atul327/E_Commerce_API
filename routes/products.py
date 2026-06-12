@@ -29,7 +29,7 @@ def get_current_user(authorization : str = Header()):
     return payload
 
 # to add new produt
-@product_route.post("/add_product")
+@product_route.post("/products")
 def add_product(product : schema.AddProduct, current_user = Depends(get_current_user), db : Session = Depends(get_db)):
     user_email = current_user.get("sub")
 
@@ -40,6 +40,7 @@ def add_product(product : schema.AddProduct, current_user = Depends(get_current_
     
     new_product = models.Product(
         name = product.name,
+        stock = product.stock,
         price = product.price
     )
 
