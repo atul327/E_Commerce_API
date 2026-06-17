@@ -301,14 +301,14 @@ def update_order_status(order_status : schema.UpdateStatus, order_id : int, curr
     }
 
 
-@order_route.post("/returns/{order_id}")
-def return_order(reason : schema.OrderReturn, order_id : int = Path(), current_user = Depends(get_current_user), db : Session = Depends(get_db)):
+@order_route.post("/returns")
+def return_order(ret : schema.OrderReturn, current_user = Depends(get_current_user), db : Session = Depends(get_db)):
     user_email = current_user.get("sub")
 
     db_user = db.query(models.User).filter(models.User.email == user_email).first()
 
     db_order = db.query(models.Order).filter(
-                            models.Order.id == order_id,
+                            models.Order.id == ret.order_id,
                             models.Order.user_id == db_user.id
                         ).first()
 
@@ -316,67 +316,92 @@ def return_order(reason : schema.OrderReturn, order_id : int = Path(), current_u
         raise HTTPException(404, "Order not found")
 
     if db_order.status != "Delevered":
-        raise HTTPException(403, "Only delivered orders can be returned")
+        raise HTTPException(403, "Order is not delevered yet")
     
-    db_orderItem = db.query(models.OrderItem).filter(models.OrderItem.order_id == db_order.id).first()    
+    db_orderItem = db.query(models.OrderItem).filter(
+        models.OrderItem.order_id == db_order.id,
+        models.OrderItem.product_id == ret.product_id).first()    
 
+    if not db_orderItem:
+        raise HTTPException(
+            status_code=404,
+            detail="Order items not found"
+        )
+        
+    existing_order = db.query(models.Returns).filter(
+        models.Returns.order_id == ret.order_id,
+        models.Returns.product_id == ret.product_id,
+    ).first()
+
+    if existing_order:
+        raise HTTPException(status_code=400, detail=f"{existing_order.type} request already exist")
+          
+        
     return_order = models.Returns(
         user_id=db_order.user_id,
         order_id=db_order.id,
         product_id=db_orderItem.product_id,
         type="Return",
-        reason=reason.reason.value
+        reason=ret.reason.value
     )
 
     db.add(return_order)
     db.commit()
+    
     db.refresh(return_order)
     
     return {
         "message" : "Order return Successfull",
-        "order_id" : db_orderItem.order_id
+        "data" : {
+            "order_id" : db_orderItem.order_id,
+            "product_id" : db_orderItem.product_id
+        }
     }
 
 
-@order_route.post("/replace/{order_id}")
-def replace_order_item(reason : schema.OrderReplace, order_id : int = Path(), current_user = Depends(get_current_user), db : Session = Depends(get_db)):
+@order_route.post("/replace")
+def replace_order_item(ret : schema.OrderReplace, current_user = Depends(get_current_user), db : Session = Depends(get_db)):
     user_email = current_user.get("sub")
 
     db_user = db.query(models.User).filter(models.User.email == user_email).first()
 
     db_order = db.query(models.Order).filter(
             models.Order.user_id == db_user.id,
-            models.Order.id == order_id
+            models.Order.id == ret.order_id
             ).first()
+    
+    if not db_order:
+        raise HTTPException(404, "Order not found")
 
-    if db_order.status == "Delevered":
+    if db_order.status != "Delevered":
+        raise HTTPException(403, "Order not delevered yet")
         
-        db_orderItem = db.query(models.OrderItem).filter(models.OrderItem.order_id == order_id).first()
+    db_orderItem = db.query(models.OrderItem).filter(
+        models.OrderItem.order_id == db_order.id,
+        models.OrderItem.product_id == ret.product_id).first()
 
-        if not db_orderItem:
-            raise HTTPException(
-                status_code=404,
-                detail="Order items not found"
-            )
-        existing_order = db.query(models.Returns).filter(
-            models.Returns.order_id == order_id,
-            models.Returns.type == "Replace"
-        ).first()
-
-        if existing_order:
-            raise HTTPException(status_code=400, detail="Replace request already exist")
-            
-        replace_order = models.Returns(
-            user_id = db_user.id,
-            order_id = order_id,
-            product_id =  db_orderItem.product_id,
-            type = "Replace",
-            reason = reason.reason.value
+    if not db_orderItem:
+        raise HTTPException(
+            status_code=404,
+            detail="Order items not found"
         )
+    existing_order = db.query(models.Returns).filter(
+        models.Returns.order_id == ret.order_id,
+        models.Returns.product_id == ret.product_id
+    ).first()
 
-        db.add(replace_order)
-    else:
-        raise HTTPException(status_code=403, detail = "The order is "+ db_order.status)
+    if existing_order:
+        raise HTTPException(status_code=400, detail = "Replace request already exists")
+        
+    replace_order = models.Returns(
+        user_id = db_user.id,
+        order_id = ret.order_id,
+        product_id =  db_orderItem.product_id,
+        type = "Replace",
+        reason = ret.reason.value
+    )
+
+    db.add(replace_order)
     
     db.commit()
     db.refresh(replace_order)
