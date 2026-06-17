@@ -61,5 +61,5 @@ class Returns(Base):
     product_id = Column(Integer, ForeignKey(Product.id))
     type = Column(String(50))
     reason = Column(String(50))
-    status = Column(String(50))
+    status = Column(String(50), default="Request")
     created_at = Column(DateTime, default=datetime.now)

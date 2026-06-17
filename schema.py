@@ -64,6 +64,8 @@ class OrderReturnReason(str, Enum):
     Defective = "Defective"
 
 class OrderReturn(BaseModel):
+    order_id : int 
+    product_id : int 
     reason : OrderReturnReason
 
 class OrderReplaceReason(str, Enum):
@@ -71,4 +73,8 @@ class OrderReplaceReason(str, Enum):
     Defective = "Defective"
 
 class OrderReplace(BaseModel):
+    order_id : int
+    product_id : int
     reason : OrderReplaceReason
+
+
