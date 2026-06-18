@@ -1,4 +1,4 @@
-from fastapi import APIRouter, Depends, Header, HTTPException, Path
+from fastapi import APIRouter, Depends, Header, HTTPException, Path, Query
 from sqlalchemy.orm import Session
 from database import SessionLocal
 
@@ -139,4 +139,15 @@ def delete_product(p_id : int = Path(example="1", description="Product ID"), cur
             "name" : db_id.name,
             "price" : db_id.price
         }
+    }
+
+@product_route.get("/search")
+def search_product(name : str = Query(), db : Session = Depends(get_db)):
+    db_product = db.query(models.Product).filter(models.Product.name.ilike(f"%{name}%")).all()
+
+    if not db_product:
+        raise HTTPException(status_code=404, detail="No Product found")
+    
+    return{
+        "Products" : db_product
     }
