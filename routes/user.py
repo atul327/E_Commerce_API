@@ -172,3 +172,42 @@ def detele_user_account(current_user = Depends(get_current_user), db : Session =
     return {
         "message" : "User Deleted Sucessfully"
     }
+
+
+@user_route.get("/requests")
+def get_all_return_replace_order(current_user = Depends(get_current_user), db : Session = Depends(get_db)):
+    user_email = current_user.get("sub")
+
+    db_user = db.query(models.User).filter(models.User.email == user_email).first()
+
+    result = (
+        db.query(
+            models.Returns.id.label("return_id"),
+            models.User.id.label("user_id"),
+            models.Returns.order_id,
+            models.Returns.type,
+            models.Returns.reason,
+            models.Returns.status          
+        ).join(
+            models.User,
+            models.Returns.user_id == models.User.id
+        ).filter(
+            models.Returns.user_id == db_user.id
+            ).all()
+    ) 
+
+    order_details_list = []
+    for item in result:
+        order_details_list.append({
+            "return ID" : item.return_id,
+            "User_id" : item.user_id,
+            "Order_ID" : item.order_id,
+            "Type" : item.type,
+            "Reason" : item.reason,
+            "Status" : item.status
+        })
+
+    return {
+        "message" : "Order Details",
+        "Order Details" : order_details_list
+    }
