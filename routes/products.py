@@ -141,13 +141,18 @@ def delete_product(p_id : int = Path(example="1", description="Product ID"), cur
         }
     }
 
+
+#Searching with pagination
 @product_route.get("/search")
-def search_product(name : str = Query(), db : Session = Depends(get_db)):
-    db_product = db.query(models.Product).filter(models.Product.name.ilike(f"%{name}%")).all()
+def search_product(name : str = Query(""), page : int = Query(1, ge=1), limit : int = Query(10, ge=1, le=100), db : Session = Depends(get_db)):
+
+    offset = (page-1) * limit
+
+    db_product = db.query(models.Product).filter(models.Product.name.ilike(f"%{name}%")).offset(offset).limit(limit).all()
 
     if not db_product:
         raise HTTPException(status_code=404, detail="No Product found")
-    
+
     return{
         "Products" : db_product
     }
