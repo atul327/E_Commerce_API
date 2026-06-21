@@ -1,6 +1,7 @@
 from fastapi import APIRouter, Depends, Header, HTTPException, Path, Query
 from sqlalchemy.orm import Session
 from database import SessionLocal
+from typing import Optional
 
 import schema
 import models
@@ -142,17 +143,60 @@ def delete_product(p_id : int = Path(example="1", description="Product ID"), cur
     }
 
 
-#Searching with pagination
+#Searching with Pagination and Sorting (Asc/Desc)
 @product_route.get("/search")
-def search_product(name : str = Query(""), page : int = Query(1, ge=1), limit : int = Query(10, ge=1, le=100), db : Session = Depends(get_db)):
+def search_product(name : str = Query(""),
+                #  For filtering the data
+                    max_price : Optional[int] = Query(None, ge=0),
+                    min_price : Optional[int] = Query(None, ge=0),
+                #  to sort the record
+                    sort : str = Query("asc"),
+                #  For the Pagination
+                    page : int = Query(1, ge=1), 
+                    limit : int = Query(10, ge=1, le=100), 
+                    db : Session = Depends(get_db)):
 
+    # offset is for to skip the record which is in offset
     offset = (page-1) * limit
 
-    db_product = db.query(models.Product).filter(models.Product.name.ilike(f"%{name}%")).offset(offset).limit(limit).all()
+    # Sorting logic
+    if sort == "asc":
+        sorting = models.Product.price.asc()
+    elif sort == "desc":
+        sorting = models.Product.price.desc()
+    else:
+        raise HTTPException(status_code=400, detail="Sorting Order must be asc or desc")
 
-    if not db_product:
+    # Base query create karo
+    # SQL:
+    # SELECT * FROM products;
+    db_product = db.query(models.Product)
+
+    # Product name ke basis par search karo
+    db_product = db_product.filter(models.Product.name.ilike(f"%{name}%"))
+
+    # Agar user ne max_price diya hai
+    # To usse kam ya equal price wale products fetch karo
+    if max_price is not None:
+        db_product = db_product.filter(models.Product.price <= max_price)
+
+    # Agar user ne min_price diya hai
+    # To usse bade ya equal price wale products fetch karo
+    if min_price is not  None:
+        db_product = db_product.filter(models.Product.price >= min_price)
+    
+    # Products ko ascending ya descending order me sort karo
+    db_product = db_product.order_by(sorting)
+
+    # Pagination apply karo
+    db_product = db_product.offset(offset).limit(limit)
+    
+    # Query execute karo aur database se actual records fetch karo
+    products = db_product.all()
+
+    if not products:
         raise HTTPException(status_code=404, detail="No Product found")
 
     return{
-        "Products" : db_product
+        "Products" : products
     }

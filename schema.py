@@ -76,5 +76,3 @@ class OrderReplace(BaseModel):
     order_id : int
     product_id : int
     reason : OrderReplaceReason
-
-
