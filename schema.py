@@ -76,3 +76,9 @@ class OrderReplace(BaseModel):
     order_id : int
     product_id : int
     reason : OrderReplaceReason
+
+class Reviews(BaseModel):
+    order_id : int 
+    product_id : int
+    rating : int = Field(ge = 1, le = 5)
+    comment : str

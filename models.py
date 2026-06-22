@@ -63,3 +63,13 @@ class Returns(Base):
     reason = Column(String(50))
     status = Column(String(50), default="Request")
     created_at = Column(DateTime, default=datetime.now)
+
+class Reviews(Base):
+    __tablename__ = "reviews"
+
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    user_id = Column(Integer, ForeignKey(User.id))
+    product_id = Column(Integer, ForeignKey(Product.id))
+    rating = Column(Integer)
+    comment = Column(String(100))
+    created_at = Column(DateTime, default=datetime.now)
