@@ -1,6 +1,7 @@
 from fastapi import APIRouter, Depends, HTTPException, Header 
 from database import SessionLocal, Base
 from sqlalchemy.orm import Session
+from sqlalchemy import or_, and_
 
 import schema
 import models
@@ -210,4 +211,55 @@ def get_all_return_replace_order(current_user = Depends(get_current_user), db : 
     return {
         "message" : "Order Details",
         "Order Details" : order_details_list
+    }
+
+
+@user_route.post("/reviews")
+def user_reviews(review : schema.Reviews, current_user = Depends(get_current_user), db : Session = Depends(get_db)):
+    user_email = current_user.get("sub")
+
+    db_user = db.query(models.User).filter(models.User.email == user_email).first()
+
+    db_order = db.query(models.Order)\
+        .filter(
+            and_(models.Order.user_id == db_user.id,
+                models.Order.id == review.order_id
+                )).first()
+
+    if not db_order:
+        raise HTTPException(status_code=404, detail="No Order found")
+
+    if db_order.status != "Delevered":
+        raise HTTPException(status_code=400, detail="Product is not delevered You can,t review it")
+        
+    db_orderItem = db.query(models.OrderItem)\
+        .filter(
+            and_(models.OrderItem.order_id == db_order.id,
+                models.OrderItem.product_id == review.product_id
+            )).first()
+        
+    if not db_orderItem:
+        raise HTTPException(status_code=404, detail="No Order product found")
+
+    new_review = models.Reviews(
+        user_id = db_user.id,
+        product_id = review.product_id,
+        rating = review.rating,
+        comment = review.comment
+    )
+
+    db_review = db.query(models.Reviews).filter(
+        and_(models.Reviews.product_id == review.product_id,
+        models.Reviews.user_id == db_user.id
+        )).first()
+
+    if db_review:
+        raise HTTPException(status_code=400, detail="The Product already rated by this User")
+    
+    db.add(new_review)
+    db.commit()
+    db.refresh(new_review)
+
+    return{
+        "messsage" : "Rewiew added sucessfully"
     }
