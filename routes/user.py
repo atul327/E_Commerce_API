@@ -1,7 +1,7 @@
-from fastapi import APIRouter, Depends, HTTPException, Header 
+from fastapi import APIRouter, Depends, HTTPException, Header, Path 
 from database import SessionLocal, Base
 from sqlalchemy.orm import Session
-from sqlalchemy import or_, and_
+from sqlalchemy import or_, and_, func
 
 import schema
 import models
@@ -262,4 +262,20 @@ def user_reviews(review : schema.Reviews, current_user = Depends(get_current_use
 
     return{
         "messsage" : "Rewiew added sucessfully"
+    }
+
+
+@user_route.get("/reviews/{product_id}")
+def get_reviews(product_id : int = Path(), db : Session = Depends(get_db)):
+    db_review = db.query(models.Reviews).filter(models.Reviews.product_id == product_id).all()
+
+    if not db_review:
+        raise HTTPException(status_code=404, detail="Not Product review found")
+
+    avg_rating = db.query(func.avg(models.Reviews.rating)).filter(models.Reviews.product_id == product_id).scalar()
+    
+    return {
+        "message" : "Fetch Success",
+        "Review" : db_review,
+        "Rating average" : avg_rating
     }
