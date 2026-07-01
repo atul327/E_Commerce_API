@@ -70,13 +70,17 @@ E_comm/
 ## Installation
 
 ```bash
-git clone <https://github.com/atul327/E_Commerce_API>
+# 1. Clone the repository
+git clone https://github.com/atul327/E_Commerce_API.git
 
-cd project
+# 2. Go to the project folder
+cd E_Commerce_API
 
+# 3. Install all dependencies
 pip install -r requirements.txt
 
-uvicorn main:app --reload
+# 4. Run the FastAPI application
+python -m uvicorn main:app --reload
 ```
 
 ## Authentication
