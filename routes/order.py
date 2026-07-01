@@ -56,6 +56,7 @@ def place_order(order : schema.Order, current_user = Depends(get_current_user), 
         total = item.quantity * db_product.price
         total_amount += total
 
+
     new_order = models.Order(
         user_id = user_id,
         total_amount = total_amount,
@@ -65,16 +66,10 @@ def place_order(order : schema.Order, current_user = Depends(get_current_user), 
     )
 
     db.add(new_order)
+    db.commit()
+    db.refresh(new_order)
 
-    # order_by is used to find the the latest order_id from the order table
-    db_order = db.query(models.Order)\
-        .filter(models.Order.user_id == user_id)\
-        .order_by(models.Order.id.desc())\
-        .first()
-    
-    if not db_order:
-        raise HTTPException(status_code=404, detail="User order not found")
-    
+# This is for the order_Item
     for item in db_cart:
         db_product = db.query(models.Product).filter(models.Product.id == item.product_id).first()
 
@@ -86,20 +81,24 @@ def place_order(order : schema.Order, current_user = Depends(get_current_user), 
         
         sub_total = item.quantity * db_product.price
 
+        # return db_product.stock
+
+        if db_product.stock < item.quantity:
+            raise HTTPException(
+                status_code=400,
+                detail="Insufficient stock"
+            )
+
         new_order_item = models.OrderItem(
-            order_id = db_order.id,
+            order_id = new_order.id,
             product_id = item.product_id,
             quantity = item.quantity,
             price = db_product.price,
             subtotal = sub_total
         )
 
-
         db.add(new_order_item)
 
-
-    db.commit()
-    db.refresh(new_order)
 
     # taki user duplicate cart use na krr ske
     for item in db_cart:
@@ -110,7 +109,7 @@ def place_order(order : schema.Order, current_user = Depends(get_current_user), 
 
     return {
         "message" : "Order Placed",
-        "Status" : db_order.status,
+        "Status" : new_order.status,
         "order_details" : new_order
     }
 
@@ -238,6 +237,12 @@ def cancel_order(order_id : int = Path(), current_user = Depends(get_current_use
     db.commit()
     db.refresh(db_order)
 
+    db_order_item = db.query(models.OrderItem).filter(models.OrderItem.order_id == db_order.id).first()
+
+    db_product = db.query(models.Product).filter(models.Product.id == db_order_item.product_id).first()
+
+    db_product.stock += db_order_item.quantity
+
     return {
         "message" : "Order cancelled",
         "order_id" : db_order.id,
@@ -274,9 +279,22 @@ def update_order_status(order_status : schema.UpdateStatus, order_id : int, curr
     db_order = db.query(models.Order).filter(models.Order.id == order_id).first()
 
     if not db_order:
-        raise HTTPException(status_code=403, detail="Order not found")
+        raise HTTPException(status_code=404, detail="Order not found")
+    
+    db_orderitems = db.query(models.OrderItem).filter(models.OrderItem.order_id == db_order.id).all()
 
     if db_order.status == "Pending":
+
+        for item in db_orderitems:
+            db_product = db.query(models.Product).filter(
+                models.Product.id == item.product_id
+            ).first()
+
+            if db_product.stock < item.quantity:
+                raise HTTPException(400, "Insufficient stock")
+
+            db_product.stock -= item.quantity
+
         db_order.status = "Processing"
 
     elif db_order.status == "Processing":
