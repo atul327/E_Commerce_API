@@ -55,8 +55,8 @@ def add_product(product : schema.AddProduct, current_user = Depends(get_current_
         "email" : user_email
     }
 
-# for geting single product based on ID of product
-@product_route.get("/get_product/{p_id}")
+# for geting single product based on ID of product & add response model
+@product_route.get("/get_product/{p_id}", response_model = schema.ProductResponse)
 def get_product(p_id : int = Path(..., example="1", description="Product ID"), db : Session = Depends(get_db)):
 
     db_product = db.query(models.Product).filter(models.Product.id == p_id).first()

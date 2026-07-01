@@ -234,14 +234,15 @@ def cancel_order(order_id : int = Path(), current_user = Depends(get_current_use
     
     db_order.status = "Cancelled"
 
-    db.commit()
-    db.refresh(db_order)
-
+    
     db_order_item = db.query(models.OrderItem).filter(models.OrderItem.order_id == db_order.id).first()
 
     db_product = db.query(models.Product).filter(models.Product.id == db_order_item.product_id).first()
 
     db_product.stock += db_order_item.quantity
+
+    db.commit()
+    db.refresh(db_order)
 
     return {
         "message" : "Order cancelled",
@@ -354,7 +355,7 @@ def return_order(ret : schema.OrderReturn, current_user = Depends(get_current_us
     if existing_order:
         raise HTTPException(status_code=400, detail=f"{existing_order.type} request already exist")
           
-        
+
     return_order = models.Returns(
         user_id=db_order.user_id,
         order_id=db_order.id,
@@ -362,6 +363,13 @@ def return_order(ret : schema.OrderReturn, current_user = Depends(get_current_us
         type="Return",
         reason=ret.reason.value
     )
+
+    db_product = db.query(models.Product).filter(models.Product.id == db_orderItem.product_id).first()
+
+    reason_list = ["Damaged product", "Defective"]  
+
+    if ret.reason.value not in reason_list:
+        db_product.stock += db_orderItem.quantity
 
     db.add(return_order)
     db.commit()
