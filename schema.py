@@ -82,3 +82,14 @@ class Reviews(BaseModel):
     product_id : int
     rating : int = Field(ge = 1, le = 5)
     comment : str
+
+
+# Add response model for the security and validation
+class GetProductResponseModel(BaseModel):
+    id : int
+    name : str
+    price : float
+
+class ProductResponse(BaseModel):
+    message : str
+    product : GetProductResponseModel
