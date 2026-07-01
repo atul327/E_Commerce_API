@@ -70,7 +70,7 @@ E_comm/
 ## Installation
 
 ```bash
-git clone <repository-url>
+git clone <[repository-url](https://github.com/atul327/E_Commerce_API)>
 
 cd project
 
