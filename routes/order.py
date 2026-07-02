@@ -39,79 +39,81 @@ def place_order(order : schema.Order, current_user = Depends(get_current_user), 
     db_user = db.query(models.User).filter(models.User.email == user_email).first()
 
     user_id = db_user.id
-    
-    db_cart = db.query(models.Cart).filter(models.Cart.user_id == user_id).all()
-    
-    if not db_cart:
-        raise HTTPException(
-            status_code=404,
-            detail="Cart is empty"
-        )
-    
-    total_amount = 0
-
-    for item in db_cart: 
-        db_product = db.query(models.Product).filter(models.Product.id == item.product_id).first()
-
-        total = item.quantity * db_product.price
-        total_amount += total
-
-
-    new_order = models.Order(
-        user_id = user_id,
-        total_amount = total_amount,
-        status = "Pending",
-        payment_method = order.payment_method,
-        user_address = db_user.user_address
-    )
-
-    db.add(new_order)
-    db.commit()
-    db.refresh(new_order)
-
-# This is for the order_Item
-    for item in db_cart:
-        db_product = db.query(models.Product).filter(models.Product.id == item.product_id).first()
-
-        if not db_product:
+    try:
+        db_cart = db.query(models.Cart).filter(models.Cart.user_id == user_id).all()
+        
+        if not db_cart:
             raise HTTPException(
-                404,
-                "Product not found"
+                status_code=404,
+                detail="Cart is empty"
             )
         
-        sub_total = item.quantity * db_product.price
+        total_amount = 0
 
-        # return db_product.stock
+        for item in db_cart: 
+            db_product = db.query(models.Product).filter(models.Product.id == item.product_id).first()
 
-        if db_product.stock < item.quantity:
-            raise HTTPException(
-                status_code=400,
-                detail="Insufficient stock"
-            )
+            total = item.quantity * db_product.price
+            total_amount += total
 
-        new_order_item = models.OrderItem(
-            order_id = new_order.id,
-            product_id = item.product_id,
-            quantity = item.quantity,
-            price = db_product.price,
-            subtotal = sub_total
+
+        new_order = models.Order(
+            user_id = user_id,
+            total_amount = total_amount,
+            status = "Pending",
+            payment_method = order.payment_method,
+            user_address = db_user.user_address
         )
 
-        db.add(new_order_item)
+        db.add(new_order)
+        db.flush()
+        db.refresh(new_order)
+
+# This is for the order_Item
+        for item in db_cart:
+            db_product = db.query(models.Product).filter(models.Product.id == item.product_id).first()
+
+            if not db_product:
+                raise HTTPException(
+                    404,
+                    "Product not found"
+                )
+            
+            sub_total = item.quantity * db_product.price
+
+            # return db_product.stock
+
+            if db_product.stock < item.quantity:
+                raise HTTPException(
+                    status_code=400,
+                    detail="Insufficient stock"
+                )
+
+            new_order_item = models.OrderItem(
+                order_id = new_order.id,
+                product_id = item.product_id,
+                quantity = item.quantity,
+                price = db_product.price,
+                subtotal = sub_total
+            )
+
+            db.add(new_order_item)
 
 
-    # taki user duplicate cart use na krr ske
-    for item in db_cart:
-        db.delete(item)
+        # taki user duplicate cart use na krr ske
+        for item in db_cart:
+            db.delete(item)
 
-    db.commit()
-    db.refresh(new_order_item)
+        db.commit()
 
-    return {
-        "message" : "Order Placed",
-        "Status" : new_order.status,
-        "order_details" : new_order
-    }
+        return {
+            "message" : "Order Placed",
+            "Status" : new_order.status,
+            "order_details" : new_order
+        }
+    except Exception:
+        db.rollback()
+        raise HTTPException(403, "Order can't be placed")
 
 # route for the showing User order details
 @order_route.get("/myorder")
