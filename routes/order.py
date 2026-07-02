@@ -66,7 +66,7 @@ def place_order(order : schema.Order, current_user = Depends(get_current_user), 
         )
 
         db.add(new_order)
-        db.flush()
+        db.flush() # Temporarily store the data for accesing the column element (like new_order.id)
         db.refresh(new_order)
 
 # This is for the order_Item
