@@ -414,6 +414,7 @@ def return_order(ret : schema.OrderReturn, current_user = Depends(get_current_us
             }
         }
     
+    # if the error is come from HTTP code then handle by it
     except HTTPException:
         db.rollback()
         raise 
