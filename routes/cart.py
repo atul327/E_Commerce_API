@@ -92,23 +92,14 @@ def remove_cart(p_id : int = Path(example="1"), current_user = Depends(get_curre
 
     user_id = db_user.id
 
-    db_product = db.query(models.Cart).filter(models.Cart.user_id == user_id).first()
+    db_cart = db.query(models.Cart).filter(
+        models.Cart.user_id == user_id,
+        models.Cart.product_id == p_id
+    ).first()
 
-    pro_id = db_product.product_id
-
-    if pro_id != p_id:
-        raise HTTPException(status_code=404, detail="Product not found")
-    
-    # user ki kitne product cart me available hai 
-    cart_item = db.query(models.Cart).filter(models.Cart.user_id == user_id).filter()
-    
-    db_cart = db.query(models.Cart).filter(models.Cart.product_id == pro_id).first()
-
-    cart_id = db_cart.product_id
-
-    if  cart_id != p_id:
-        raise HTTPException(status_code=404, detail="Cart Product not found")
-    
+    if not db_cart:
+        raise HTTPException(404, "Product not found in cart")
+   
     db.delete(db_cart)
     db.commit()
 
@@ -125,13 +116,31 @@ def view_cart(current_user = Depends(get_current_user), db : Session = Depends(g
 
     user_id = db_user.id 
 
-    cart_item = db.query(models.Cart).all()
+    db_cart = db.query(models.Cart).filter(models.Cart.user_id == user_id).all()
 
-    if not cart_item:
-        raise HTTPException(403, "User Not found")
+    if len(db_cart) == 0:
+        return {
+            "message": "Cart is empty",
+            "cart_items": []
+        }
 
+    cart_items = []
+
+    for item in db_cart:
+        # product = db.query(models.Product).filter(
+        #     models.Product.id == item.product_id
+        # ).first()
+
+        cart_items.append({
+            "product_id": item.product_id,
+            "product_name": item.product.name if item.product else None,  #use relationship here for product name
+            "price": item.product.price if item.product else None, #use relationship here for product price
+            "quantity": item.quantity,
+            "total": (item.product.price * item.quantity) if item.product else 0
+        })
+        
     return {
         "message" : "Cart Item fetched",
-        "Cart Item" : cart_item
+        "Cart Item" : cart_items
     }
 

@@ -1,6 +1,7 @@
 from sqlalchemy import Column, Integer, String, Float, ForeignKey, DateTime
 from datetime import datetime
 from database import Base
+from sqlalchemy.orm import relationship
 
 class User(Base):
     __tablename__ = "user"
@@ -30,6 +31,8 @@ class Cart(Base):
     user_id = Column(Integer, ForeignKey(User.id))
     product_id = Column(Integer, ForeignKey(Product.id))
     quantity = Column(Integer)
+
+    product = relationship("Product")
 
 class Order(Base):
     __tablename__ = "order_place"
