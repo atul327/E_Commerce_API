@@ -32,6 +32,7 @@ class AddProduct(BaseModel):
 class UpdateProduct(BaseModel):
     name : str
     price : float
+    stock : int
 
 class AddToCart(BaseModel):
     user_id : int
