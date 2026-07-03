@@ -116,6 +116,7 @@ def place_order(order : schema.Order, current_user = Depends(get_current_user), 
         raise 
 
     except Exception as e:
+        db.rollback()
         raise HTTPException(
         status_code=500,
         detail="Internal Server Error"
@@ -263,6 +264,7 @@ def cancel_order(order_id : int = Path(), current_user = Depends(get_current_use
         raise 
 
     except Exception as e:
+        db.rollback()
         raise HTTPException(
         status_code=500,
         detail="Internal Server Error"
@@ -342,6 +344,7 @@ def update_order_status(order_status : schema.UpdateStatus, order_id : int, curr
         raise 
 
     except Exception as e:
+        db.rollback()
         raise HTTPException(
         status_code=500,
         detail="Internal Server Error"
@@ -420,6 +423,7 @@ def return_order(ret : schema.OrderReturn, current_user = Depends(get_current_us
         raise 
 
     except Exception as e:
+        db.rollback()
         raise HTTPException(
         status_code=500,
         detail="Internal Server Error"
