@@ -103,6 +103,7 @@ def update_product_details(product : schema.UpdateProduct , p_id : int = Path(ex
 
     db_product.name = product.name
     db_product.price = product.price
+    db_product.stock = product.stock
 
     db.commit()
     db.refresh(db_product)
