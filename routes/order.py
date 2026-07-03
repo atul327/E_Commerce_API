@@ -111,9 +111,15 @@ def place_order(order : schema.Order, current_user = Depends(get_current_user), 
             "Status" : new_order.status,
             "order_details" : new_order
         }
-    except Exception:
+    except HTTPException:
         db.rollback()
-        raise HTTPException(403, "Order can't be placed")
+        raise 
+
+    except Exception as e:
+        raise HTTPException(
+        status_code=500,
+        detail="Internal Server Error"
+    )
 
 # route for the showing User order details
 @order_route.get("/myorder")
@@ -218,39 +224,49 @@ def cancel_order(order_id : int = Path(), current_user = Depends(get_current_use
     user_email = current_user.get("sub")
 
     db_user = db.query(models.User).filter(models.User.email == user_email).first()
+    try:
+        db_order = db.query(models.Order).filter(
+                models.Order.user_id == db_user.id,
+                models.Order.id == order_id).first()
+        
+        if not db_order:
+            raise HTTPException(status_code=403, detail="Order not found")
+        
+        existing_status = db.query(models.Order).filter(
+            models.Order.id == order_id,
+            models.Order.status == "Cancelled"
+        ).first()
 
-    db_order = db.query(models.Order).filter(
-            models.Order.user_id == db_user.id,
-            models.Order.id == order_id).first()
-    
-    if not db_order:
-        raise HTTPException(status_code=403, detail="Order not found")
-    
-    existing_status = db.query(models.Order).filter(
-        models.Order.id == order_id,
-        models.Order.status == "Cancelled"
-    ).first()
+        if existing_status:
+            raise HTTPException(status_code=403, detail = f"Order is already {db_order.status}")
+        
+        db_order.status = "Cancelled"
 
-    if existing_status:
-        raise HTTPException(status_code=403, detail = f"Order is already {db_order.status}")
-    
-    db_order.status = "Cancelled"
+        
+        db_order_item = db.query(models.OrderItem).filter(models.OrderItem.order_id == db_order.id).all()
 
-    
-    db_order_item = db.query(models.OrderItem).filter(models.OrderItem.order_id == db_order.id).first()
+        for item in db_order_item:
+            db_product = db.query(models.Product).filter(models.Product.id == item.product_id).first()
 
-    db_product = db.query(models.Product).filter(models.Product.id == db_order_item.product_id).first()
+            db_product.stock += item.quantity
 
-    db_product.stock += db_order_item.quantity
+        db.commit()
+        db.refresh(db_order)
 
-    db.commit()
-    db.refresh(db_order)
+        return {
+            "message" : "Order cancelled",
+            "order_id" : db_order.id,
+            "Status" : db_order.status
+        }
+    except HTTPException:
+        db.rollback()
+        raise 
 
-    return {
-        "message" : "Order cancelled",
-        "order_id" : db_order.id,
-        "Status" : db_order.status
-    }
+    except Exception as e:
+        raise HTTPException(
+        status_code=500,
+        detail="Internal Server Error"
+    )
 
 
 
@@ -278,48 +294,59 @@ def update_order_status(order_status : schema.UpdateStatus, order_id : int, curr
 
     if db_user.role != "admin":
         raise HTTPException(status_code=403, detail="User can't update the status")
+    try: 
+        db_order = db.query(models.Order).filter(models.Order.id == order_id).first()
+
+        if not db_order:
+            raise HTTPException(status_code=404, detail="Order not found")
+        
+        db_orderitems = db.query(models.OrderItem).filter(models.OrderItem.order_id == db_order.id).all()
+
+        if db_order.status == "Pending":
+
+            for item in db_orderitems:
+                db_product = db.query(models.Product).filter(
+                    models.Product.id == item.product_id
+                ).first()
+
+                if db_product.stock < item.quantity:
+                    raise HTTPException(400, "Insufficient stock")
+
+                db_product.stock -= item.quantity
+
+            db_order.status = "Processing"
+
+        elif db_order.status == "Processing":
+            db_order.status = "Shipped"
+
+        elif db_order.status == "Shipped":
+            db_order.status = "Delevered"
+
+        else:
+            raise HTTPException(
+                status_code=400,
+                detail="Order is delevered and cannot be updated further"
+            )
+        
+        db.commit()
+        db.refresh(db_order)
+
+        return {
+            "message" : "Order status is updated",
+            "order_id" : order_id,
+            "order_status" : db_order.status
+        }
     
-    db_order = db.query(models.Order).filter(models.Order.id == order_id).first()
+    except HTTPException:
+        db.rollback()
+        raise 
 
-    if not db_order:
-        raise HTTPException(status_code=404, detail="Order not found")
-    
-    db_orderitems = db.query(models.OrderItem).filter(models.OrderItem.order_id == db_order.id).all()
-
-    if db_order.status == "Pending":
-
-        for item in db_orderitems:
-            db_product = db.query(models.Product).filter(
-                models.Product.id == item.product_id
-            ).first()
-
-            if db_product.stock < item.quantity:
-                raise HTTPException(400, "Insufficient stock")
-
-            db_product.stock -= item.quantity
-
-        db_order.status = "Processing"
-
-    elif db_order.status == "Processing":
-        db_order.status = "Shipped"
-
-    elif db_order.status == "Shipped":
-        db_order.status = "Delevered"
-
-    else:
+    except Exception as e:
         raise HTTPException(
-            status_code=400,
-            detail="Order is delevered and cannot be updated further"
-        )
-    
-    db.commit()
-    db.refresh(db_order)
+        status_code=500,
+        detail="Internal Server Error"
+    )
 
-    return {
-        "message" : "Order status is updated",
-        "order_id" : order_id,
-        "order_status" : db_order.status
-    }
 
 
 @order_route.post("/returns")
@@ -328,63 +355,74 @@ def return_order(ret : schema.OrderReturn, current_user = Depends(get_current_us
 
     db_user = db.query(models.User).filter(models.User.email == user_email).first()
 
-    db_order = db.query(models.Order).filter(
-                            models.Order.id == ret.order_id,
-                            models.Order.user_id == db_user.id
-                        ).first()
+    try:
+        db_order = db.query(models.Order).filter(
+                                models.Order.id == ret.order_id,
+                                models.Order.user_id == db_user.id
+                            ).first()
 
-    if not db_order:
-        raise HTTPException(404, "Order not found")
+        if not db_order:
+            raise HTTPException(404, "Order not found")
 
-    if db_order.status != "Delevered":
-        raise HTTPException(403, "Order is not delevered yet")
-    
-    db_orderItem = db.query(models.OrderItem).filter(
-        models.OrderItem.order_id == db_order.id,
-        models.OrderItem.product_id == ret.product_id).first()    
-
-    if not db_orderItem:
-        raise HTTPException(
-            status_code=404,
-            detail="Order items not found"
-        )
+        if db_order.status != "Delevered":
+            raise HTTPException(403, "Order is not delevered yet")
         
-    existing_order = db.query(models.Returns).filter(
-        models.Returns.order_id == ret.order_id,
-        models.Returns.product_id == ret.product_id,
-    ).first()
+        db_orderItem = db.query(models.OrderItem).filter(
+            models.OrderItem.order_id == db_order.id,
+            models.OrderItem.product_id == ret.product_id).first()    
 
-    if existing_order:
-        raise HTTPException(status_code=400, detail=f"{existing_order.type} request already exist")
-          
+        if not db_orderItem:
+            raise HTTPException(
+                status_code=404,
+                detail="Order items not found"
+            )
+            
+        existing_order = db.query(models.Returns).filter(
+            models.Returns.order_id == ret.order_id,
+            models.Returns.product_id == ret.product_id,
+        ).first()
 
-    return_order = models.Returns(
-        user_id=db_order.user_id,
-        order_id=db_order.id,
-        product_id=db_orderItem.product_id,
-        type="Return",
-        reason=ret.reason.value
-    )
+        if existing_order:
+            raise HTTPException(status_code=400, detail=f"{existing_order.type} request already exist")
+            
 
-    db_product = db.query(models.Product).filter(models.Product.id == db_orderItem.product_id).first()
+        return_order = models.Returns(
+            user_id=db_order.user_id,
+            order_id=db_order.id,
+            product_id=db_orderItem.product_id,
+            type="Return",
+            reason=ret.reason.value
+        )
 
-    reason_list = ["Damaged product", "Defective"]  
+        db_product = db.query(models.Product).filter(models.Product.id == db_orderItem.product_id).first()
 
-    if ret.reason.value not in reason_list:
-        db_product.stock += db_orderItem.quantity
+        reason_list = ["Damaged product", "Defective"]  
 
-    db.add(return_order)
-    db.commit()
-    
-    db.refresh(return_order)
-    
-    return {
-        "message" : "Order return Successfull",
-        "data" : {
-            "order_id" : db_orderItem.order_id,
-            "product_id" : db_orderItem.product_id
+        if ret.reason.value not in reason_list:
+            db_product.stock += db_orderItem.quantity
+
+        db.add(return_order)
+        db.commit()
+        
+        db.refresh(return_order)
+        
+        return {
+            "message" : "Order return Successfull",
+            "data" : {
+                "order_id" : db_orderItem.order_id,
+                "product_id" : db_orderItem.product_id
+            }
         }
-    }
+    
+    except HTTPException:
+        db.rollback()
+        raise 
+
+    except Exception as e:
+        raise HTTPException(
+        status_code=500,
+        detail="Internal Server Error"
+    )
 
 
 @order_route.post("/replace")
