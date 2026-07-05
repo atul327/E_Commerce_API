@@ -40,6 +40,7 @@ class AddToCart(BaseModel):
     quantity : int 
 
 class UpdateCart(BaseModel):
+    product_id : int
     quantity : int
 
 class Order(BaseModel):

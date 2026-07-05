@@ -63,6 +63,8 @@ def add_to_cart(cart : schema.AddToCart, current_user = Depends(get_current_user
         "message" : "Product is added to cart"
     }
 
+
+# have to work on this
 @cart_route.put("/update")
 def update_cart(cart : schema.UpdateCart, current_user = Depends(get_current_user), db : Session = Depends(get_db)):
     user_email = current_user.get("sub")
@@ -71,8 +73,17 @@ def update_cart(cart : schema.UpdateCart, current_user = Depends(get_current_use
 
     user_id = db_user.id 
 
-    cart_id = db.query(models.Cart).filter(models.Cart.user_id == user_id).first()
+    cart_id = db.query(models.Cart).filter(
+        models.Cart.user_id == user_id,
+        models.Cart.product_id == cart.product_id
+        ).first()
 
+    if not cart_id:
+        raise HTTPException(
+            status_code=404,
+            detail="Cart item not found"
+        )
+    
     cart_id.quantity = cart.quantity
 
     db.commit()
@@ -80,7 +91,9 @@ def update_cart(cart : schema.UpdateCart, current_user = Depends(get_current_use
 
     return {
         "message" : "Cart Update sucessfully",
-        "cart_product" : cart_id
+        "cart_product" : {
+            "Product name" : cart_id.product.name #Use relationship cancept
+        }
     }
     
 
@@ -127,9 +140,6 @@ def view_cart(current_user = Depends(get_current_user), db : Session = Depends(g
     cart_items = []
 
     for item in db_cart:
-        # product = db.query(models.Product).filter(
-        #     models.Product.id == item.product_id
-        # ).first()
 
         cart_items.append({
             "product_id": item.product_id,
