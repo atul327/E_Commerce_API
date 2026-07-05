@@ -51,9 +51,11 @@ def place_order(order : schema.Order, current_user = Depends(get_current_user), 
         total_amount = 0
 
         for item in db_cart: 
-            db_product = db.query(models.Product).filter(models.Product.id == item.product_id).first()
+            # db_product = db.query(models.Product).filter(models.Product.id == item.product_id).first()
 
-            total = item.quantity * db_product.price
+            # use relationship here (item.product.price)
+
+            total = item.quantity * item.product.price
             total_amount += total
 
 

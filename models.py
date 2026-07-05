@@ -24,6 +24,8 @@ class Product(Base):
     stock = Column(Integer)
     price = Column(Float)
 
+    cart = relationship("Cart", back_populates="product")
+
 class Cart(Base):
     __tablename__  = "cart"
 
@@ -32,7 +34,7 @@ class Cart(Base):
     product_id = Column(Integer, ForeignKey(Product.id))
     quantity = Column(Integer)
 
-    product = relationship("Product")
+    product = relationship("Product", back_populates="cart")
 
 class Order(Base):
     __tablename__ = "order_place"
