@@ -25,6 +25,7 @@ class Product(Base):
     price = Column(Float)
 
     cart = relationship("Cart", back_populates="product")
+    orderitem = relationship("OrderItem", back_populates="product")
 
 class Cart(Base):
     __tablename__  = "cart"
@@ -56,6 +57,8 @@ class OrderItem(Base):
     quantity = Column(Integer)
     price = Column(Float)
     subtotal = Column(Float)
+
+    product = relationship("Product", back_populates="orderitem")
 
 class Returns(Base):
     __tablename__ = "returns"

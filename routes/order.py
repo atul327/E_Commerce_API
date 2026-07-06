@@ -1,6 +1,6 @@
 from fastapi import APIRouter, Header, Depends, HTTPException, Path
 from database import SessionLocal
-from sqlalchemy.orm import Session 
+from sqlalchemy.orm import Session, joinedload, selectinload
 from sqlalchemy import or_, and_
 
 import models
@@ -40,7 +40,13 @@ def place_order(order : schema.Order, current_user = Depends(get_current_user), 
 
     user_id = db_user.id
     try:
-        db_cart = db.query(models.Cart).filter(models.Cart.user_id == user_id).all()
+
+        # use joinload for improving the efficiency and response
+        # joinload first take the all data from database then perform operation on it
+        db_cart = db.query(models.Cart)\
+            .options(joinedload(models.Cart.product))\
+            .filter(models.Cart.user_id == user_id)\
+            .all()
         
         if not db_cart:
             raise HTTPException(
@@ -73,7 +79,9 @@ def place_order(order : schema.Order, current_user = Depends(get_current_user), 
 
 # This is for the order_Item
         for item in db_cart:
-            db_product = db.query(models.Product).filter(models.Product.id == item.product_id).first()
+            db_product = db.query(models.Product)\
+                .filter(models.Product.id == item.product_id)\
+                .first()
 
             if not db_product:
                 raise HTTPException(
