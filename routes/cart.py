@@ -1,6 +1,6 @@
 from fastapi import APIRouter, Depends, HTTPException, Header, Path
 from database import SessionLocal
-from sqlalchemy.orm import Session
+from sqlalchemy.orm import Session, selectinload
 
 import schema
 import auth
@@ -129,7 +129,10 @@ def view_cart(current_user = Depends(get_current_user), db : Session = Depends(g
 
     user_id = db_user.id 
 
-    db_cart = db.query(models.Cart).filter(models.Cart.user_id == user_id).all()
+    db_cart = db.query(models.Cart)\
+        .options(selectinload(models.Cart.product))\
+        .filter(models.Cart.user_id == user_id)\
+        .all()
 
     if len(db_cart) == 0:
         return {
