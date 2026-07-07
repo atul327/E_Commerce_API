@@ -45,7 +45,7 @@ def register(user : schema.Registration, db : Session = Depends(get_db)):
 def login(user : schema.Login, db : Session = Depends(get_db)):
     user_email = db.query(models.User).filter(models.User.email == user.email).first()
 
-    if user_email.is_active:
+    if not user_email.is_active:
         raise HTTPException(status_code=403, detail="Account has been deleted")
 
     if not user_email:
@@ -279,3 +279,55 @@ def get_reviews(product_id : int = Path(), db : Session = Depends(get_db)):
         "Review" : db_review,
         "Rating average" : avg_rating
     }
+
+
+# """async non-blocking"""
+# from fastapi import APIRouter, Depends, HTTPException, Header, Path 
+# from database import SessionLocal, Base
+# from sqlalchemy import or_, and_, func, select
+
+# from sqlalchemy.ext.asyncio import AsyncSession
+
+# import schema
+# import models
+# import auth
+
+# user_route = APIRouter(
+#     prefix="/user"
+# )
+
+# async def get_db():
+#     async with SessionLocal as db:
+#         yield db
+
+# @user_route.post('/register')
+# async def register(user : schema.Registration, db : AsyncSession = Depends(get_db)):
+#     # exixting_user = db.query(models.User).filter(models.User.email == user.email).first()
+
+#     # async non-blocking 
+#     result = await db.execute(
+#         select(models.User).where(
+#             models.User.email == user.email
+#         )
+#     )
+
+#     existing_user = result.scalar_one_or_none()
+
+#     if existing_user:
+#         raise HTTPException(status_code=400, detail="User already exist")
+    
+#     new_user = models.User(
+#         username = user.username,
+#         email = user.email,
+#         mob_num = user.mob_num,
+#         password = auth.hashed_pass(user.password),
+#         date_of_birth = user.date_of_birth,
+#         role = "user",
+#         user_address = user.user_address
+#     )
+
+#     db.add(new_user)
+#     await db.commit()
+#     await db.refresh(new_user)
+
+#     return {"message" : "Registration Successfull"}

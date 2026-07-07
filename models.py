@@ -1,4 +1,4 @@
-from sqlalchemy import Column, Integer, String, Float, ForeignKey, DateTime
+from sqlalchemy import Column, Integer, String, Float, ForeignKey, DateTime, Boolean
 from datetime import datetime
 from database import Base
 from sqlalchemy.orm import relationship
@@ -14,7 +14,7 @@ class User(Base):
     date_of_birth = Column(String(255))
     role = Column(String(20), default="user")
     user_address = Column(String)
-    is_active = Column(String, default=True)
+    is_active = Column(Boolean, default=True)
 
 class Product(Base):
     __tablename__ = "products"
