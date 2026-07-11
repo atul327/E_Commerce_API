@@ -1,6 +1,8 @@
 from fastapi import APIRouter, Depends, HTTPException, Header, Path
-from database import SessionLocal
-from sqlalchemy.orm import Session, selectinload
+from database import AsyncSessionLocal
+from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy import select
+from sqlalchemy.orm import selectinload
 
 import schema
 import auth
@@ -11,12 +13,9 @@ cart_route = APIRouter(
     prefix="/cart" 
 )
 
-def get_db():
-    db = SessionLocal()
-    try:
+async def get_db():
+    async with AsyncSessionLocal() as db:
         yield db
-    finally:
-        db.close()
         
 # request the token from header and verify it
 def get_current_user(authorization : str = Header()):
@@ -29,54 +28,86 @@ def get_current_user(authorization : str = Header()):
 
     return payload
 
+
 @cart_route.post("/add")
-def add_to_cart(cart : schema.AddToCart, current_user = Depends(get_current_user), db : Session = Depends(get_db)):
+async def add_to_cart(cart : schema.AddToCart, current_user = Depends(get_current_user), db : AsyncSession = Depends(get_db)):
+
     user_email = current_user.get("sub")
 
     # to find out the user_id from User table
-    db_user = db.query(models.User).filter(models.User.email == user_email).first()
+    result = await db.execute(
+        select(models.User).where(
+            models.User.email == user_email
+        )
+    )
+
+    db_user = result.scalar_one_or_none()
 
     user_id = db_user.id
 
     if user_id != cart.user_id:
         raise HTTPException(status_code=404, detail="User not found")
 
+
     # to find out the product_id from the Products Table
-    db_product = db.query(models.Product).filter(models.Product.id == cart.product_id).first()
+    result = await db.execute(
+        select(models.Product).where(
+            models.Product.id == cart.product_id
+        )
+    )
+
+    db_product = result.scalar_one_or_none()
 
     product_id = db_product.id
 
     if not product_id:
         raise HTTPException(status_code=404, detail="Product not found")
     
+
     new_cart = models.Cart(
         user_id = user_id,
         product_id = product_id,
         quantity = cart.quantity
     )
 
+
     db.add(new_cart)
-    db.commit()
-    db.refresh(new_cart)
+
+    await db.commit()
+
+    await db.refresh(new_cart)
+
 
     return {
         "message" : "Product is added to cart"
     }
 
-
 # have to work on this
 @cart_route.put("/update")
-def update_cart(cart : schema.UpdateCart, current_user = Depends(get_current_user), db : Session = Depends(get_db)):
+async def update_cart(cart : schema.UpdateCart, current_user = Depends(get_current_user), db : AsyncSession = Depends(get_db)):
+
     user_email = current_user.get("sub")
 
-    db_user = db.query(models.User).filter(models.User.email == user_email).first()
+    result = await db.execute(
+        select(models.User).where(
+            models.User.email == user_email
+        )
+    )
+
+    db_user = result.scalar_one_or_none()
 
     user_id = db_user.id 
 
-    cart_id = db.query(models.Cart).filter(
-        models.Cart.user_id == user_id,
-        models.Cart.product_id == cart.product_id
-        ).first()
+
+    result = await db.execute(
+        select(models.Cart).where(
+            models.Cart.user_id == user_id,
+            models.Cart.product_id == cart.product_id
+        )
+    )
+
+    cart_id = result.scalar_one_or_none()
+
 
     if not cart_id:
         raise HTTPException(
@@ -84,55 +115,89 @@ def update_cart(cart : schema.UpdateCart, current_user = Depends(get_current_use
             detail="Cart item not found"
         )
     
+
     cart_id.quantity = cart.quantity
 
-    db.commit()
-    db.refresh(cart_id)
+    await db.commit()
+
+    await db.refresh(cart_id)
+
 
     return {
         "message" : "Cart Update sucessfully",
         "cart_product" : {
-            "Product name" : cart_id.product.name #Use relationship cancept
+            "Product name" : cart_id.product.name
         }
     }
     
 
 @cart_route.delete("/remove/{p_id}")
-def remove_cart(p_id : int = Path(example="1"), current_user = Depends(get_current_user), db : Session = Depends(get_db)):
+async def remove_cart(p_id : int = Path(example="1"), current_user = Depends(get_current_user), db : AsyncSession = Depends(get_db)):
+
     user_email = current_user.get("sub")
 
-    db_user = db.query(models.User).filter(models.User.email == user_email).first()
+
+    result = await db.execute(
+        select(models.User).where(
+            models.User.email == user_email
+        )
+    )
+
+    db_user = result.scalar_one_or_none()
 
     user_id = db_user.id
 
-    db_cart = db.query(models.Cart).filter(
-        models.Cart.user_id == user_id,
-        models.Cart.product_id == p_id
-    ).first()
+
+    result = await db.execute(
+        select(models.Cart).where(
+            models.Cart.user_id == user_id,
+            models.Cart.product_id == p_id
+        )
+    )
+
+    db_cart = result.scalar_one_or_none()
+
 
     if not db_cart:
         raise HTTPException(404, "Product not found in cart")
-   
-    db.delete(db_cart)
-    db.commit()
+
+
+    await db.delete(db_cart)
+
+    await db.commit()
+
 
     return {
         "message" : "Product removed from Cart",
     }
-
-
 @cart_route.get("/view")
-def view_cart(current_user = Depends(get_current_user), db : Session = Depends(get_db)):
+async def view_cart(current_user = Depends(get_current_user), db : AsyncSession = Depends(get_db)):
+
     user_email = current_user.get("sub")
 
-    db_user = db.query(models.User).filter(models.User.email == user_email).first()
+
+    result = await db.execute(
+        select(models.User).where(
+            models.User.email == user_email
+        )
+    )
+
+    db_user = result.scalar_one_or_none()
+
 
     user_id = db_user.id 
 
-    db_cart = db.query(models.Cart)\
-        .options(selectinload(models.Cart.product))\
-        .filter(models.Cart.user_id == user_id)\
-        .all()
+
+    result = await db.execute(
+        select(models.Cart)
+        .options(selectinload(models.Cart.product))
+        .where(
+            models.Cart.user_id == user_id
+        )
+    )
+
+    db_cart = result.scalars().all()
+
 
     if len(db_cart) == 0:
         return {
@@ -140,20 +205,22 @@ def view_cart(current_user = Depends(get_current_user), db : Session = Depends(g
             "cart_items": []
         }
 
+
     cart_items = []
+
 
     for item in db_cart:
 
         cart_items.append({
             "product_id": item.product_id,
-            "product_name": item.product.name if item.product else None,  #use relationship here for product name
-            "price": item.product.price if item.product else None, #use relationship here for product price
+            "product_name": item.product.name if item.product else None,
+            "price": item.product.price if item.product else None,
             "quantity": item.quantity,
             "total": (item.product.price * item.quantity) if item.product else 0
         })
-        
+
+
     return {
         "message" : "Cart Item fetched",
         "Cart Item" : cart_items
     }
-

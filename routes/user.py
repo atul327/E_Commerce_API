@@ -1,7 +1,9 @@
+"""async non-blocking"""
 from fastapi import APIRouter, Depends, HTTPException, Header, Path 
-from database import SessionLocal, Base
-from sqlalchemy.orm import Session
-from sqlalchemy import or_, and_, func
+from database import AsyncSessionLocal, Base
+from sqlalchemy import or_, and_, func, select
+
+from sqlalchemy.ext.asyncio import AsyncSession
 
 import schema
 import models
@@ -11,18 +13,24 @@ user_route = APIRouter(
     prefix="/user"
 )
 
-def get_db():
-    db = SessionLocal()
-    try:
+async def get_db():
+    async with AsyncSessionLocal() as db:
         yield db
-    finally:
-        db.close()
 
 @user_route.post('/register')
-def register(user : schema.Registration, db : Session = Depends(get_db)):
-    exixting_user = db.query(models.User).filter(models.User.email == user.email).first()
+async def register(user : schema.Registration, db : AsyncSession = Depends(get_db)):
+    # exixting_user = db.query(models.User).filter(models.User.email == user.email).first()
 
-    if exixting_user:
+    # async non-blocking 
+    result = await db.execute(
+        select(models.User).where(
+            models.User.email == user.email
+        )
+    )
+
+    existing_user = result.scalar_one_or_none()
+
+    if existing_user:
         raise HTTPException(status_code=400, detail="User already exist")
     
     new_user = models.User(
@@ -36,16 +44,30 @@ def register(user : schema.Registration, db : Session = Depends(get_db)):
     )
 
     db.add(new_user)
-    db.commit()
-    db.refresh(new_user)
+    await db.commit()
+    await db.refresh(new_user)
 
     return {"message" : "Registration Successfull"}
 
 @user_route.post("/login")
-def login(user : schema.Login, db : Session = Depends(get_db)):
-    user_email = db.query(models.User).filter(models.User.email == user.email).first()
+async def login(user : schema.Login, db : AsyncSession = Depends(get_db)):
+    result = await db.execute(
+        select(models.User).where(
+        models.User.email == user.email
+        )
+    )
 
-    if not user_email.is_active:
+    # user_email = db.query(models.User).filter(models.User.email == user.email).first()
+
+    user_email = result.scalar_one_or_none()
+
+    if not user_email:
+        raise HTTPException(
+            status_code=404,
+            detail="User not found"
+        )
+
+    if user_email.is_active:
         raise HTTPException(status_code=403, detail="Account has been deleted")
 
     if not user_email:
@@ -78,7 +100,7 @@ def get_current_user(authorization: str = Header()):
     return payload
 
 @user_route.get('/profile')
-def profile(current_user = Depends(get_current_user), db : Session = Depends(get_db)):
+async def profile(current_user = Depends(get_current_user), db : AsyncSession = Depends(get_db)):
     if not current_user:
         raise HTTPException(status_code=400, detail="Missing token")
     
@@ -86,7 +108,14 @@ def profile(current_user = Depends(get_current_user), db : Session = Depends(get
     email = current_user.get("sub")
 
     # fetch the user data based on email
-    user = db.query(models.User).filter(models.User.email == email).first()
+    result = await db.execute(
+        select(models.User).where(
+            models.User.email == email
+        )
+    )
+    # user = db.query(models.User).filter(models.User.email == email).first()
+
+    user = result.scalar_one_or_none()
 
     if not user:
         raise HTTPException(status_code=404, detail="User Not Found")
@@ -102,11 +131,19 @@ def profile(current_user = Depends(get_current_user), db : Session = Depends(get
         }
    
 @user_route.put("/update_profile")
-def update_profile( user : schema.UpdateProfile ,current_user = Depends(get_current_user),db : Session = Depends(get_db)):
+async def update_profile( user : schema.UpdateProfile ,current_user = Depends(get_current_user),db : AsyncSession = Depends(get_db)):
     
     email = current_user.get("sub")
 
-    db_user = db.query(models.User).filter(models.User.email == email).first()
+    # db_user = db.query(models.User).filter(models.User.email == email).first()
+
+    result = await db.execute(
+        select(models.User).where(
+            models.User.email == email
+        )
+    )
+
+    db_user = result.scalar_one_or_none()
 
     if not db_user:
         raise HTTPException(
@@ -118,8 +155,8 @@ def update_profile( user : schema.UpdateProfile ,current_user = Depends(get_curr
     db_user.mob_num = user.mob_num 
     db_user.user_address = user.user_address
 
-    db.commit()
-    db.refresh(db_user)
+    await db.commit()
+    await db.refresh(db_user)
 
     return{
         "message" : "User Update successfully",
@@ -131,11 +168,19 @@ def update_profile( user : schema.UpdateProfile ,current_user = Depends(get_curr
     }
 
 @user_route.put("/change_password")
-def change_password(user : schema.ChangePass, current_user = Depends(get_current_user), db : Session = Depends(get_db)):
+async def change_password(user : schema.ChangePass, current_user = Depends(get_current_user), db : AsyncSession = Depends(get_db)):
     
     email = current_user.get("sub")
 
-    db_user = db.query(models.User).filter(models.User.email == email).first()
+    # db_user = db.query(models.User).filter(models.User.email == email).first()
+
+    result = await db.execute(
+        select(models.User).where(
+            models.User.email == email
+        )
+    )
+
+    db_user = result.scalar_one_or_none()
 
     if not db_user:
         raise HTTPException(status_code=404, detail="User not found")
@@ -151,8 +196,8 @@ def change_password(user : schema.ChangePass, current_user = Depends(get_current
 
     db_user.password = auth.hashed_pass(user.new_password)
 
-    db.commit()
-    db.refresh(db_user)
+    await db.commit()
+    await db.refresh(db_user)
 
     return {
         "message" : "Password Changed Successfully",
@@ -160,15 +205,23 @@ def change_password(user : schema.ChangePass, current_user = Depends(get_current
 
 
 @user_route.delete("/delete_account")
-def detele_user_account(current_user = Depends(get_current_user), db : Session = Depends(get_db)):
+async def detele_user_account(current_user = Depends(get_current_user), db : AsyncSession = Depends(get_db)):
     user_email =current_user.get("sub")
     
-    db_user = db.query(models.User).filter(models.User.email == user_email).first()
+    # db_user = db.query(models.User).filter(models.User.email == user_email).first()
+
+    result = await db.execute(
+        select(models.User).where(
+            models.User.email == user_email
+        )
+    )
+
+    db_user = result.scalar_one_or_none()
 
     db_user.is_active = False
 
-    db.commit()
-    db.refresh(db_user)
+    await db.commit()
+    await db.refresh(db_user)
 
     return {
         "message" : "User Deleted Sucessfully"
@@ -176,7 +229,7 @@ def detele_user_account(current_user = Depends(get_current_user), db : Session =
 
 
 @user_route.get("/requests")
-def get_all_return_replace_order(current_user = Depends(get_current_user), db : Session = Depends(get_db)):
+async def get_all_return_replace_order(current_user = Depends(get_current_user), db : AsyncSession = Depends(get_db)):
     user_email = current_user.get("sub")
 
     db_user = db.query(models.User).filter(models.User.email == user_email).first()
@@ -215,119 +268,139 @@ def get_all_return_replace_order(current_user = Depends(get_current_user), db : 
 
 
 @user_route.post("/reviews")
-def user_reviews(review : schema.Reviews, current_user = Depends(get_current_user), db : Session = Depends(get_db)):
+async def user_reviews(
+    review: schema.Reviews,
+    current_user=Depends(get_current_user),
+    db: AsyncSession = Depends(get_db)
+):
     user_email = current_user.get("sub")
 
-    db_user = db.query(models.User).filter(models.User.email == user_email).first()
-
-    db_order = db.query(models.Order)\
-        .filter(
-            and_(models.Order.user_id == db_user.id,
-                models.Order.id == review.order_id
-                )).first()
-
-    if not db_order:
-        raise HTTPException(status_code=404, detail="No Order found")
-
-    if db_order.status != "Delevered":
-        raise HTTPException(status_code=400, detail="Product is not delevered You can,t review it")
-        
-    db_orderItem = db.query(models.OrderItem)\
-        .filter(
-            and_(models.OrderItem.order_id == db_order.id,
-                models.OrderItem.product_id == review.product_id
-            )).first()
-        
-    if not db_orderItem:
-        raise HTTPException(status_code=404, detail="No Order product found")
-
-    new_review = models.Reviews(
-        user_id = db_user.id,
-        product_id = review.product_id,
-        rating = review.rating,
-        comment = review.comment
+    # Fetch User
+    result = await db.execute(
+        select(models.User).where(
+            models.User.email == user_email
+        )
     )
 
-    db_review = db.query(models.Reviews).filter(
-        and_(models.Reviews.product_id == review.product_id,
-        models.Reviews.user_id == db_user.id
-        )).first()
+    db_user = result.scalar_one_or_none()
+
+    if not db_user:
+        raise HTTPException(
+            status_code=404,
+            detail="User not found"
+        )
+
+    # Fetch Order
+    result = await db.execute(
+        select(models.Order).where(
+            and_(
+                models.Order.user_id == db_user.id,
+                models.Order.id == review.order_id
+            )
+        )
+    )
+
+    db_order = result.scalar_one_or_none()
+
+    if not db_order:
+        raise HTTPException(
+            status_code=404,
+            detail="No Order found"
+        )
+
+    if db_order.status != "Delivered":
+        raise HTTPException(
+            status_code=400,
+            detail="Product is not delivered. You can't review it."
+        )
+
+    # Fetch Order Item
+    result = await db.execute(
+        select(models.OrderItem).where(
+            and_(
+                models.OrderItem.order_id == db_order.id,
+                models.OrderItem.product_id == review.product_id
+            )
+        )
+    )
+
+    db_order_item = result.scalar_one_or_none()
+
+    if not db_order_item:
+        raise HTTPException(
+            status_code=404,
+            detail="No Order Product found"
+        )
+
+    # Check existing review
+    result = await db.execute(
+        select(models.Reviews).where(
+            and_(
+                models.Reviews.product_id == review.product_id,
+                models.Reviews.user_id == db_user.id
+            )
+        )
+    )
+
+    db_review = result.scalar_one_or_none()
 
     if db_review:
-        raise HTTPException(status_code=400, detail="The Product already rated by this User")
-    
-    db.add(new_review)
-    db.commit()
-    db.refresh(new_review)
+        raise HTTPException(
+            status_code=400,
+            detail="The Product already rated by this User"
+        )
 
-    return{
-        "messsage" : "Rewiew added sucessfully"
+    # Create Review
+    new_review = models.Reviews(
+        user_id=db_user.id,
+        product_id=review.product_id,
+        rating=review.rating,
+        comment=review.comment
+    )
+
+    db.add(new_review)
+
+    await db.commit()
+    await db.refresh(new_review)
+
+    return {
+        "message": "Review added successfully"
     }
 
 
 @user_route.get("/reviews/{product_id}")
-def get_reviews(product_id : int = Path(), db : Session = Depends(get_db)):
-    db_review = db.query(models.Reviews).filter(models.Reviews.product_id == product_id).all()
+async def get_reviews(
+    product_id: int = Path(),
+    db: AsyncSession = Depends(get_db)
+):
+
+    # Fetch all reviews
+    result = await db.execute(
+        select(models.Reviews).where(
+            models.Reviews.product_id == product_id
+        )
+    )
+
+    db_review = result.scalars().all()
 
     if not db_review:
-        raise HTTPException(status_code=404, detail="Not Product review found")
+        raise HTTPException(
+            status_code=404,
+            detail="No Product Review Found"
+        )
 
-    avg_rating = db.query(func.avg(models.Reviews.rating)).filter(models.Reviews.product_id == product_id).scalar()
-    
+    # Calculate average rating
+    result = await db.execute(
+        select(func.avg(models.Reviews.rating)).where(
+            models.Reviews.product_id == product_id
+        )
+    )
+
+    avg_rating = result.scalar()
+
     return {
-        "message" : "Fetch Success",
-        "Review" : db_review,
-        "Rating average" : avg_rating
+        "message": "Fetch Success",
+        "Review": db_review,
+        "Rating average": avg_rating
     }
 
-
-# """async non-blocking"""
-# from fastapi import APIRouter, Depends, HTTPException, Header, Path 
-# from database import SessionLocal, Base
-# from sqlalchemy import or_, and_, func, select
-
-# from sqlalchemy.ext.asyncio import AsyncSession
-
-# import schema
-# import models
-# import auth
-
-# user_route = APIRouter(
-#     prefix="/user"
-# )
-
-# async def get_db():
-#     async with SessionLocal as db:
-#         yield db
-
-# @user_route.post('/register')
-# async def register(user : schema.Registration, db : AsyncSession = Depends(get_db)):
-#     # exixting_user = db.query(models.User).filter(models.User.email == user.email).first()
-
-#     # async non-blocking 
-#     result = await db.execute(
-#         select(models.User).where(
-#             models.User.email == user.email
-#         )
-#     )
-
-#     existing_user = result.scalar_one_or_none()
-
-#     if existing_user:
-#         raise HTTPException(status_code=400, detail="User already exist")
-    
-#     new_user = models.User(
-#         username = user.username,
-#         email = user.email,
-#         mob_num = user.mob_num,
-#         password = auth.hashed_pass(user.password),
-#         date_of_birth = user.date_of_birth,
-#         role = "user",
-#         user_address = user.user_address
-#     )
-
-#     db.add(new_user)
-#     await db.commit()
-#     await db.refresh(new_user)
-
-#     return {"message" : "Registration Successfull"}
