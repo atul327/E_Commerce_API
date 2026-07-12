@@ -4,6 +4,8 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select, or_, and_
 from sqlalchemy.orm import joinedload, selectinload
 
+from services.order_service import checkout
+
 import models
 import schema
 import auth
@@ -427,10 +429,10 @@ async def update_order_status(order_status: schema.UpdateStatus,
 
                 db_product = result.scalar_one_or_none()
 
-                if db_product.stock < item.quantity:
-                    raise HTTPException(400, "Insufficient stock")
+                # if db_product.stock < item.quantity:
+                #     raise HTTPException(400, "Insufficient stock")
 
-                db_product.stock -= item.quantity
+                # db_product.stock -= item.quantity
 
             db_order.status = "Processing"
 
@@ -466,6 +468,8 @@ async def update_order_status(order_status: schema.UpdateStatus,
             status_code=500,
             detail="Internal Server Error"
         )
+    
+
 @order_route.post("/returns")
 async def return_order(ret: schema.OrderReturn, current_user=Depends(get_current_user), db: AsyncSession = Depends(get_db)):
 
@@ -490,14 +494,11 @@ async def return_order(ret: schema.OrderReturn, current_user=Depends(get_current
 
         db_order = result.scalar_one_or_none()
 
-
         if not db_order:
             raise HTTPException(404, "Order not found")
 
-
         if db_order.status != "Delevered":
             raise HTTPException(403, "Order is not delevered yet")
-
 
         result = await db.execute(
             select(models.OrderItem).where(
@@ -507,7 +508,6 @@ async def return_order(ret: schema.OrderReturn, current_user=Depends(get_current
         )
 
         db_orderItem = result.scalar_one_or_none()
-
 
         if not db_orderItem:
             raise HTTPException(
@@ -675,3 +675,21 @@ async def replace_order_item(ret: schema.OrderReplace, current_user=Depends(get_
         "message": "Order Replace success",
         "order_id": db_orderItem.order_id
     }
+
+# this checkout endpoint is use for place_order with proper validation
+@order_route.post("/checkout")
+async def checkout_api(current_user = Depends(get_current_user), db : AsyncSession = Depends(get_db)):
+    user_email = current_user.get("sub")
+
+    result = await db.execute(
+        select(models.User).where(
+            models.User.email == user_email
+        )
+    )
+
+    db_user = result.scalar_one_or_none()
+
+    return await checkout(db, db_user)
+
+
+# Buy now for the user can directly buy product without fetching the cart
