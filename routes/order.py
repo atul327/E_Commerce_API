@@ -11,6 +11,8 @@ import schema
 import auth
 import routes.user
 
+import services.order_service
+
 order_route = APIRouter(
     prefix="/order"
 )
@@ -693,3 +695,16 @@ async def checkout_api(current_user = Depends(get_current_user), db : AsyncSessi
 
 
 # Buy now for the user can directly buy product without fetching the cart
+@order_route.post('/buy_now/{p_id}')
+async def buy_now_api(data : schema.BuyNow, p_id : int = Path(), current_user = Depends(get_current_user) ,db : AsyncSession = Depends(get_db)):
+    user_email = current_user.get("sub")
+
+    result = await db.execute(
+        select(models.User).where(
+            models.User.email == user_email
+        )
+    )
+
+    db_user = result.scalar_one()
+
+    return await services.order_service.buy_now(db, data, p_id, db_user)

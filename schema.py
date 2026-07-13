@@ -95,3 +95,7 @@ class GetProductResponseModel(BaseModel):
 class ProductResponse(BaseModel):
     message : str
     product : GetProductResponseModel
+
+class BuyNow(BaseModel):
+    quantity : int
+    payment_method : str

@@ -91,3 +91,67 @@ async def checkout(db : AsyncSession, user_details : models.User):
     except Exception:
         await db.rollback()
         raise
+
+
+# Buy Now
+async def buy_now(db: AsyncSession, data, p_id, user):
+    try:
+        result = await db.execute(
+            select(models.Product).where(
+                models.Product.id == p_id
+            )
+        )
+
+        db_product = result.scalar_one_or_none()
+
+        if not db_product:
+            raise HTTPException(404, "No product available")
+        
+        if db_product.stock < data.quantity:
+            raise HTTPException(
+                400,
+                "Insufficient stock"
+            )
+        
+        total_amount = db_product.price * data.quantity
+
+        new_order = models.Order(
+            user_id = user.id,
+            total_amount = total_amount,
+            status = "Pending",
+            payment_method = data.payment_method,
+            user_address = user.user_address
+        )
+
+        db.add(new_order)
+
+        await db.flush()
+
+        new_order_item = models.OrderItem(
+            order_id = new_order.id,
+            product_id = db_product.id,
+            quantity = data.quantity,
+            price = db_product.price,
+            subtotal = total_amount
+        )
+
+        db.add(new_order_item)
+
+        db_product.stock -= data.quantity
+
+        await db.commit()
+
+
+        return {
+            "message":"Order placed successfully",
+            "order_id":new_order.id,
+            "total_amount":total_amount
+        }
+
+    except HTTPException:
+        await db.rollback()
+        raise
+
+    except Exception:
+        await db.rollback()
+        raise
