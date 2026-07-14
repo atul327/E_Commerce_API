@@ -2,6 +2,8 @@ from passlib.context import CryptContext
 from jose import jwt 
 from datetime import datetime, timedelta
 
+from config import settings
+
 pwd_context = CryptContext(schemes=['bcrypt'])
 
 def hashed_pass(password : str):
@@ -15,9 +17,10 @@ def verify_pass(plain_pass : str, password : str):
 
 
 # Token generating
-SECRET_KEY ="mysecretkey"
-ALGORITH = "HS256"
-ACCESS_TIME_MINUTE = 30
+SECRET_KEY = settings.SECRET_KEY
+ALGORITHM = settings.ALGORITHM
+ACCESS_TIME_MINUTE = settings.ACCESS_TOKEN_EXPIRE_MINUTES
+
 
 def create_access_token(data : dict):
     to_encode = data.copy()
@@ -31,7 +34,7 @@ def create_access_token(data : dict):
     encode_jwt = jwt.encode(
         to_encode,
         SECRET_KEY,
-        algorithm=ALGORITH
+        algorithm=ALGORITHM
     )
 
     return encode_jwt
@@ -41,7 +44,7 @@ def verify_token(token : str):
     payload = jwt.decode(
         token,
         SECRET_KEY,
-        algorithms=[ALGORITH]
+        algorithms=[ALGORITHM]
     )
 
     return payload
