@@ -1,4 +1,4 @@
-from sqlalchemy import Column, Integer, String, Float, ForeignKey, DateTime, Boolean
+from sqlalchemy import Column, Integer, String, Float, ForeignKey, DateTime, Boolean, Numeric
 from datetime import datetime
 from database import Base
 from sqlalchemy.orm import relationship
@@ -47,6 +47,11 @@ class Order(Base):
     payment_method = Column(String)
     user_address = Column(String) # profile se aayenga
     created_at = Column(DateTime, default=datetime.now)
+
+    payment = relationship(
+        "Payment",
+        back_populates="order"
+    )
     
 class OrderItem(Base):
     __tablename__ = "order_item"
@@ -81,3 +86,20 @@ class Reviews(Base):
     rating = Column(Integer)
     comment = Column(String(100))
     created_at = Column(DateTime, default=datetime.now)
+
+class Payment(Base):
+    __tablename__ = "payments"
+
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    order_id = Column(Integer, ForeignKey(Order.id))
+    gateway = Column(String(50))
+    gateway_order_id = Column(String(100),unique=True)
+    gateway_payment_id = Column(String(100), unique=True, nullable=True)
+    amount = Column(Numeric(10,2))
+    status = Column(String(20), default="Pending")
+    created_at = Column(DateTime, default=datetime.utcnow)
+
+    order = relationship(
+        "Order",
+        back_populates="payment"
+    )
