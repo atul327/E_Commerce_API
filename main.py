@@ -2,13 +2,7 @@ from contextlib import asynccontextmanager
 from fastapi import FastAPI
 
 from database import Base, engine
-
-# IMPORTANT: models load karo
-import models.user
-import models.products
-import models.cart
-import models.order
-import models.payment
+import models   # <-- ye models.py file load karega
 
 
 from routes.user import user_route
