@@ -1,6 +1,5 @@
-from fastapi import FastAPI, Depends, HTTPException
+from fastapi import FastAPI
 from database import Base, engine
-
 
 from routes.user import user_route
 from routes.products import product_route
@@ -11,12 +10,12 @@ from routes.payment import payment_router
 
 app = FastAPI()
 
+
 @app.on_event("startup")
 async def create_tables():
     async with engine.begin() as conn:
         await conn.run_sync(Base.metadata.create_all)
 
-app = FastAPI()
 
 app.include_router(user_route)
 app.include_router(product_route)
@@ -26,9 +25,6 @@ app.include_router(admin_route)
 app.include_router(payment_router)
 
 
-@app.get('/')
+@app.get("/")
 def home():
-    return {"message" : "Hello User"}
-
-
-
+    return {"message": "Hello User"}
