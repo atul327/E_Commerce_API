@@ -2,7 +2,14 @@ from contextlib import asynccontextmanager
 from fastapi import FastAPI
 
 from database import Base, engine
-import models
+
+# IMPORTANT: models load karo
+import models.user
+import models.products
+import models.cart
+import models.order
+import models.payment
+
 
 from routes.user import user_route
 from routes.products import product_route
@@ -15,12 +22,10 @@ from routes.payment import payment_router
 @asynccontextmanager
 async def lifespan(app: FastAPI):
 
-    print("Creating tables...")
+    print("REGISTERED TABLES:", Base.metadata.tables.keys())
 
     async with engine.begin() as conn:
         await conn.run_sync(Base.metadata.create_all)
-
-    print("Tables created")
 
     yield
 
