@@ -10,10 +10,10 @@ class User(Base):
     username = Column(String(50))
     email = Column(String(50))
     mob_num = Column(String(15))
-    password = Column(String(20))
+    password = Column(String(255))
     date_of_birth = Column(String(255))
     role = Column(String(20), default="user")
-    user_address = Column(String)
+    user_address = Column(String(255))
     is_active = Column(Boolean, default=True)
 
 class Product(Base):
