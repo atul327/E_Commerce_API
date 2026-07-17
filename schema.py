@@ -8,7 +8,7 @@ class Registration(BaseModel):
     mob_num : str = Field(min_length=10, max_length=10)
     password : str = Field(min_length=8, max_length=12)
     date_of_birth :  str = Field(description="12-10-2006")
-    role : Optional[str]
+    role : str = "user"
     user_address : str
 
 class Login(BaseModel):

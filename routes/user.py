@@ -67,7 +67,7 @@ async def login(user : schema.Login, db : AsyncSession = Depends(get_db)):
             detail="User not found"
         )
 
-    if user_email.is_active:
+    if not user_email.is_active:
         raise HTTPException(status_code=403, detail="Account has been deleted")
 
     if not user_email:
