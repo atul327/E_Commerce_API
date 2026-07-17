@@ -46,7 +46,7 @@ async def place_order(order: schema.Order, current_user=Depends(get_current_user
 
     db_user = result.scalar_one_or_none()
 
-    user_id = db_user.id
+    # user_id = db_user.id
 
     try:
 
@@ -56,7 +56,7 @@ async def place_order(order: schema.Order, current_user=Depends(get_current_user
         result = await db.execute(
             select(models.Cart)
             .options(joinedload(models.Cart.product))
-            .where(models.Cart.user_id == user_id)
+            .where(models.Cart.user_id == db_user.id)
         )
 
         db_cart = result.scalars().all()
@@ -76,7 +76,7 @@ async def place_order(order: schema.Order, current_user=Depends(get_current_user
 
 
         new_order = models.Order(
-            user_id=user_id,
+            user_id=db_user.id,
             total_amount=total_amount,
             status="Pending",
             payment_method=order.payment_method,
@@ -107,6 +107,9 @@ async def place_order(order: schema.Order, current_user=Depends(get_current_user
                 )
 
             sub_total = item.quantity * db_product.price
+
+            # Update Stock
+            db_product.stock -= item.quantity
 
             if db_product.stock < item.quantity:
                 raise HTTPException(

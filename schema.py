@@ -35,7 +35,7 @@ class UpdateProduct(BaseModel):
     stock : int
 
 class AddToCart(BaseModel):
-    user_id : int
+    # user_id : int
     product_id : int 
     quantity : int 
 
@@ -44,7 +44,7 @@ class UpdateCart(BaseModel):
     quantity : int
 
 class Order(BaseModel):
-    user_id : int
+    # user_id : int
     payment_method : str
 
 

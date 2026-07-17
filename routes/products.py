@@ -26,7 +26,7 @@ def get_current_user(authorization: str = Header()):
     return payload
 
 # to add new produt
-@product_route.post("/products")
+@product_route.post("/add_products")
 async def add_product(product: schema.AddProduct, current_user=Depends(get_current_user), db: AsyncSession=Depends(get_db)):
     user_email = current_user.get("sub")
 
@@ -34,6 +34,12 @@ async def add_product(product: schema.AddProduct, current_user=Depends(get_curre
         select(models.User).where(models.User.email == user_email)
     )
     db_user = result.scalar_one_or_none()
+
+    if db_user is None:
+        raise HTTPException(
+            status_code=404,
+            detail="User not found"
+        )
 
     if db_user.role != "admin":
         raise HTTPException(status_code=403, detail="User can't be add product")

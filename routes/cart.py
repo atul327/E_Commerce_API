@@ -43,9 +43,9 @@ async def add_to_cart(cart : schema.AddToCart, current_user = Depends(get_curren
 
     db_user = result.scalar_one_or_none()
 
-    user_id = db_user.id
+    # user_id = db_user.id
 
-    if user_id != cart.user_id:
+    if  not db_user:
         raise HTTPException(status_code=404, detail="User not found")
 
 
@@ -65,7 +65,7 @@ async def add_to_cart(cart : schema.AddToCart, current_user = Depends(get_curren
     
 
     new_cart = models.Cart(
-        user_id = user_id,
+        user_id = db_user.id,
         product_id = product_id,
         quantity = cart.quantity
     )
