@@ -20,7 +20,7 @@ class Product(Base):
     __tablename__ = "products"
 
     id = Column(Integer, primary_key=True, autoincrement=True)
-    name = Column(String)
+    name = Column(String(100))
     stock = Column(Integer)
     price = Column(Float)
 
@@ -42,10 +42,10 @@ class Order(Base):
 
     id = Column(Integer, primary_key=True, autoincrement=True)
     user_id = Column(Integer, ForeignKey(User.id))
-    total_amount = Column(Float) #internally pure product ka total
-    status = Column(String)
-    payment_method = Column(String)
-    user_address = Column(String) # profile se aayenga
+    total_amount = Column(Float)
+    status = Column(String(50))
+    payment_method = Column(String(50))
+    user_address = Column(String(255))
     created_at = Column(DateTime, default=datetime.now)
 
     payment = relationship(
