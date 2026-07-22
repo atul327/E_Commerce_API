@@ -89,11 +89,24 @@ async def login(user : schema.Login, db : AsyncSession = Depends(get_db)):
         "token_type" : "bearer"
     }
 
-def get_current_user(authorization: str = Header()):
-    if not authorization:
-        raise HTTPException(401, "Missing token")
+# def get_current_user(authorization: str = Header()):
+#     if not authorization:
+#         raise HTTPException(401, "Missing token")
 
-    token = authorization.split(" ")[1]
+#     token = authorization.split(" ")[1]
+
+#     payload = auth.verify_token(token)
+
+#     return payload
+
+from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
+
+security = HTTPBearer()
+
+def get_current_user(
+    credentials: HTTPAuthorizationCredentials = Depends(security)
+):
+    token = credentials.credentials
 
     payload = auth.verify_token(token)
 
