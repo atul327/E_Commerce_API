@@ -14,9 +14,17 @@
 from sqlalchemy.ext.asyncio import create_async_engine, AsyncSession, async_sessionmaker
 from sqlalchemy.orm import sessionmaker, declarative_base
 from config import settings
+import os
+
+
+DATABASE_URL = (
+    settings.TEST_DB_URL
+    if os.getenv("TESTING")
+    else settings.DB_URL
+)
 
 engine = create_async_engine(
-    settings.DB_URL,
+    DATABASE_URL,
     echo=True,
     connect_args={
         "ssl": {
@@ -30,3 +38,13 @@ AsyncSessionLocal = sessionmaker(
 )
 
 Base = declarative_base()
+
+# ============================
+# Database Dependency
+# ============================
+
+async def get_db():
+
+    async with AsyncSessionLocal() as db:
+
+        yield db

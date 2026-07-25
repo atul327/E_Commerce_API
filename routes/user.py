@@ -1,6 +1,6 @@
 """async non-blocking"""
 from fastapi import APIRouter, Depends, HTTPException, Header, Path 
-from database import AsyncSessionLocal, Base
+from database import AsyncSessionLocal, Base, get_db
 from sqlalchemy import or_, and_, func, select
 
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -12,10 +12,6 @@ import auth
 user_route = APIRouter(
     prefix="/user"
 )
-
-async def get_db():
-    async with AsyncSessionLocal() as db:
-        yield db
 
 @user_route.post('/register')
 async def register(user : schema.Registration, db : AsyncSession = Depends(get_db)):
