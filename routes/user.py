@@ -234,7 +234,13 @@ async def detele_user_account(current_user = Depends(get_current_user), db : Asy
 async def get_all_return_replace_order(current_user = Depends(get_current_user), db : AsyncSession = Depends(get_db)):
     user_email = current_user.get("sub")
 
-    db_user = db.query(models.User).filter(models.User.email == user_email).first()
+    result = await db.execute(
+    select(models.User).where(
+        models.User.email == user_email
+        )
+    )
+
+    db_user = result.scalar_one_or_none()
 
     result = (
         db.query(
