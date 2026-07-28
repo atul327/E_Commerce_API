@@ -17,7 +17,6 @@ Current APIs
 
 import pytest
 
-
 @pytest.mark.asyncio
 async def test_register(client):
 
@@ -35,6 +34,25 @@ async def test_register(client):
     )
 
     assert response.status_code == 200
+
+@pytest.mark.asyncio
+async def test_login(client, create_test_user):
+
+    response = await client.post(
+        "/user/login",
+        json={
+            "email" : "atulpatle@gmail.com",
+            "password" : "12345678"
+        }
+    )
+
+    assert response.status_code == 200
+
+    data = response.json()
+
+    assert "access_token" in data
+    assert data["token_type"] == "bearer"
+
 
 """
 Register Testing

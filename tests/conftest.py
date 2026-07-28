@@ -17,23 +17,17 @@ import os
 
 os.environ["TESTING"] = "1"
 
-
 import pytest
 
 from httpx import AsyncClient, ASGITransport
-
-from sqlalchemy.ext.asyncio import (
-    create_async_engine,
-    AsyncSession
-)
-
+from sqlalchemy.ext.asyncio import (create_async_engine,AsyncSession)
 from sqlalchemy.orm import sessionmaker
-
 from config import settings
 from database import Base, get_db
 from main import app
 
-
+import models
+import auth
 
 # =========================================================
 # TEST DATABASE URL
@@ -42,14 +36,12 @@ from main import app
 TEST_DATABASE_URL = settings.TEST_DB_URL
 
 
-
 # =========================================================
 # GLOBAL VARIABLE
 # Stores current test engine
 # =========================================================
 
 current_test_engine = None
-
 
 
 # =========================================================
@@ -66,10 +58,8 @@ async def test_engine():
 
     yield engine
 
-
     # Close all connections
     await engine.dispose()
-
 
 
 # =========================================================
@@ -83,9 +73,7 @@ async def prepare_database(test_engine):
 
     current_test_engine = test_engine
 
-
     print("\nCreating Test Database Tables...\n")
-
 
     async with test_engine.begin() as conn:
 
@@ -93,19 +81,15 @@ async def prepare_database(test_engine):
             Base.metadata.create_all
         )
 
-
     yield
 
-
     print("\nDeleting Test Database Tables...\n")
-
 
     async with test_engine.begin() as conn:
 
         await conn.run_sync(
             Base.metadata.drop_all
         )
-
 
 
 # =========================================================
@@ -121,11 +105,9 @@ async def db_session(test_engine):
         expire_on_commit=False
     )
 
-
     async with TestingSessionLocal() as session:
 
         yield session
-
 
 
 # =========================================================
@@ -140,17 +122,13 @@ async def override_get_db():
         expire_on_commit=False
     )
 
-
     async with TestingSessionLocal() as db:
 
         yield db
 
-
-
 # Replace production database dependency
 
 app.dependency_overrides[get_db] = override_get_db
-
 
 
 # =========================================================
@@ -164,10 +142,39 @@ async def client():
         app=app
     )
 
-
     async with AsyncClient(
         transport=transport,
         base_url="http://test"
     ) as client:
 
         yield client
+
+
+@pytest.fixture
+async def create_test_user():
+
+    TestingSessionLocal = sessionmaker(
+            bind=current_test_engine,
+            class_=AsyncSession,
+            expire_on_commit=False
+        )
+
+    async with TestingSessionLocal() as db:
+
+        user = models.User(
+            username="Atul",
+            email="atulpatle@gmail.com",
+            mob_num="9999999999",
+            password=auth.hashed_pass("12345678"),
+            date_of_birth="2000-01-01",
+            role="user",
+            user_address="Nagpur"
+        )
+
+        db.add(user)
+
+        await db.commit()
+
+        await db.refresh(user)
+
+        return user
